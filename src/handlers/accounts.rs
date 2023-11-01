@@ -1,6 +1,6 @@
 
 use crate::handlers::req_query_id;
-use crate::models::accounts::{ new_account, AccountModel, ExistAccount, NewAccount };
+use crate::models::accounts::{ new_account, AccountModel, ExistAccount, NewAccount, UpdateAccount };
 use crate::repositories::accounts::{AccountRepo, AccountTrait};
 
 use bytes::Buf;
@@ -107,6 +107,35 @@ impl<'a> AccountHandler<'a> {
         };
         Ok(res)
     }
+
+    async fn update(&mut self, body: &str) -> Result<Response<Body>> { 
+
+        let query_id = req_query_id(self.request);
+        let data: UpdateAccount = serde_json::from_str(body)?;
+        let update_acc = self.account_repo.account_update(query_id, data.clone()).await?;
+
+        let account = new_account(
+            &update_acc.id, 
+            &update_acc.name, 
+            &update_acc.description, 
+            &update_acc.balance,
+            &update_acc.created_at,
+            &update_acc.updated_at,
+        );
+
+        // let data = vec!["foo", "bar"];
+        let res = match serde_json::to_string(&account) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(INTERNAL_SERVER_ERROR.into())
+                .unwrap(),
+        };
+        Ok(res)
+    }
 }
 
 pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
@@ -125,7 +154,7 @@ pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
         (&Method::GET, true) => account_handler.list().await,
         (&Method::GET, false) => account_handler.detail().await,
         (&Method::PUT, true) => account_handler.add(body).await,
-        // (&Method::POST, false) => api_post_accounts(&pool, query_id, req).await,
+        (&Method::POST, false) => account_handler.update(body).await,
         // &Method::DELETE => api_del_accounts(req).await,
 
         // 

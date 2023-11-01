@@ -33,6 +33,12 @@ pub struct NewAccount {
     pub balance: i32,
 }
 
+#[derive(Debug, Default, Clone, FromRow, Deserialize, Serialize)]
+pub struct UpdateAccount {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub balance: Option<i32>,
+}
 
 pub fn new_account(
     id: &i32,

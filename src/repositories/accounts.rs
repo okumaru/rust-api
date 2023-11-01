@@ -1,5 +1,5 @@
 
-use crate::models::accounts::{ ExistAccount, AccountModel, NewAccount };
+use crate::models::accounts::{ ExistAccount, AccountModel, NewAccount, UpdateAccount };
 use crate::repositories::Executor;
 
 use futures_util::{future::BoxFuture, FutureExt};
@@ -32,6 +32,11 @@ pub trait AccountTrait {
     async fn account_add(
         &mut self,
         account: NewAccount,
+    ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    async fn account_update(
+        &mut self,
+        id: i32,
+        account: UpdateAccount,
     ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>>;
 }
 
@@ -96,6 +101,16 @@ impl<E: 'static + Executor> AccountTrait for AccountRepo<E> {
         account: NewAccount,
     ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>> {
         let account = query_add_account(&mut self.db, account).await;
+
+        Ok(account)
+    }
+
+    async fn account_update(
+        &mut self,
+        id: i32,
+        account: UpdateAccount,
+    ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>> {
+        let account = query_update_account(&mut self.db, id, account).await;
 
         Ok(account)
     }
@@ -167,6 +182,71 @@ fn query_add_account<'a>(
         let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblaccounts WHERE id = "#);
         let accounts = query
             .push_bind(add.last_insert_id())
+            .build_query_as::<ExistAccount>()
+            .fetch_one(db.as_executor())
+            .await
+            .unwrap();
+
+        accounts
+    }
+    .boxed()
+}
+
+struct UpdateQuery {
+    key: String,
+    value: String,
+}
+
+fn query_update_account<'a>(
+    db: &'a mut impl Executor,
+    id: i32,
+    account: UpdateAccount,
+) -> BoxFuture<'a, ExistAccount> {
+    async move {
+
+        let mut query = sqlx::QueryBuilder::new(r#"UPDATE tblaccounts SET "#);
+        let mut updates: Vec<UpdateQuery> = Vec::new();
+
+        if account.name.is_some() {
+            updates.push(UpdateQuery {
+                key: "name".to_string(),
+                value: account.name.unwrap().to_string(),
+            })
+        }
+
+        if account.description.is_some() {
+            updates.push(UpdateQuery {
+                key: "description".to_string(),
+                value: account.description.unwrap().to_string(),
+            })
+        }
+
+        if account.balance.is_some() {
+            updates.push(UpdateQuery {
+                key: "balance".to_string(),
+                value: account.balance.unwrap().to_string(),
+            })
+        }
+
+        let mut separated = query.separated(", ");
+        for update in updates.iter() {
+            separated.push(update.key.clone())
+                .push_unseparated(" = ")
+                .push_bind_unseparated(update.value.clone());
+        }
+
+        separated.push_unseparated(" WHERE id = ")
+            .push_bind_unseparated(id);
+        
+        let update = query
+            .build()
+            .execute(db.as_executor())
+            .await
+            .unwrap();
+
+        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblaccounts WHERE id = "#);
+        let accounts = query
+            .push_bind(id)
             .build_query_as::<ExistAccount>()
             .fetch_one(db.as_executor())
             .await
