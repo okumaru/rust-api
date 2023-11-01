@@ -1,12 +1,10 @@
 
 use crate::handlers::req_query_id;
-use crate::models::accounts::{ new_account, AccountModel, ExistAccount, NewAccount, UpdateAccount };
+use crate::models::accounts::{ new_account, AccountModel, NewAccount, UpdateAccount };
 use crate::repositories::accounts::{AccountRepo, AccountTrait};
 
-use bytes::Buf;
 use sqlx::mysql::MySqlPool;
-use hyper::body::{Body as BBody, to_bytes, HttpBody};
-use hyper::{header, Client, Body, Method, Request, Response, StatusCode};
+use hyper::{header, Body, Method, Request, Response, StatusCode};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;
@@ -167,7 +165,7 @@ pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
 
     let pool = MySqlPool::connect("mysql://root:local@localhost:3306/sohfin").await?;
 
-    let (mut parts, body) = req.into_parts();
+    let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await.unwrap();
     let body = std::str::from_utf8(&body_bytes).unwrap();
     

@@ -2,13 +2,8 @@
 use crate::handlers::accounts as accounts_handlers;
 
 use std::collections::HashMap;
-use bytes::Buf;
-use futures_util::{stream, StreamExt};
-use sqlx::mysql::MySqlPool;
-use hyper::server::conn::AddrStream;
 use hyper::client::HttpConnector;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{header, Body, Client, Method, Request, Response, Server, StatusCode};
+use hyper::{Body, Client, Request, Response, StatusCode};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;
@@ -22,7 +17,7 @@ static NOTFOUND: &[u8] = b"Not Found";
 
 pub async fn handler(
     req: Request<Body>,
-    client: Client<HttpConnector>,
+    _client: Client<HttpConnector>,
 ) -> Result<Response<Body>> {
 
     let default_pages = vec!["/", "/index.html"];

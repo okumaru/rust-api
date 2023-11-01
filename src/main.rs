@@ -2,12 +2,8 @@
 
 use crate::handlers::handler;
 
-use bytes::Buf;
-use futures_util::{stream, StreamExt};
-use hyper::server::conn::AddrStream;
-use hyper::client::HttpConnector;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{header, Body, Client, Method, Request, Response, Server, StatusCode};
+use hyper::{Client, Server};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;
@@ -24,9 +20,7 @@ async fn main() -> Result<()> {
 
     let addr = ([127, 0, 0, 1], 1337).into();
     let client = Client::new();
-    let fin_service = make_service_fn(|socket: &AddrStream| {
-
-        let remote_addr = socket.remote_addr();
+    let fin_service = make_service_fn(|_| {
 
         // Move a clone of `client` into the `service_fn`.
         let client = client.clone();

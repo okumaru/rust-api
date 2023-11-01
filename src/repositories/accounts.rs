@@ -1,5 +1,5 @@
 
-use crate::models::accounts::{ ExistAccount, AccountModel, NewAccount, UpdateAccount };
+use crate::models::accounts::{ ExistAccount, NewAccount, UpdateAccount };
 use crate::repositories::Executor;
 
 use futures_util::{future::BoxFuture, FutureExt};
@@ -251,8 +251,7 @@ fn query_update_account<'a>(
         separated.push_unseparated(" WHERE id = ")
             .push_bind_unseparated(id);
         
-        let update = query
-            .build()
+        query.build()
             .execute(db.as_executor())
             .await
             .unwrap();
