@@ -38,6 +38,10 @@ pub trait AccountTrait {
         id: i32,
         account: UpdateAccount,
     ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    async fn account_delete(
+        &mut self,
+        id: i32,
+    ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>>;
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +115,15 @@ impl<E: 'static + Executor> AccountTrait for AccountRepo<E> {
         account: UpdateAccount,
     ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>> {
         let account = query_update_account(&mut self.db, id, account).await;
+
+        Ok(account)
+    }
+
+    async fn account_delete(
+        &mut self,
+        id: i32,
+    ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>> {
+        let account = query_delete_account(&mut self.db, id).await;
 
         Ok(account)
     }
@@ -249,6 +262,32 @@ fn query_update_account<'a>(
             .push_bind(id)
             .build_query_as::<ExistAccount>()
             .fetch_one(db.as_executor())
+            .await
+            .unwrap();
+
+        accounts
+    }
+    .boxed()
+}
+
+fn query_delete_account<'a>(
+    db: &'a mut impl Executor,
+    id: i32,
+) -> BoxFuture<'a, ExistAccount> {
+    async move {
+
+        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblaccounts WHERE id = "#);
+        let accounts = query
+            .push_bind(id)
+            .build_query_as::<ExistAccount>()
+            .fetch_one(db.as_executor())
+            .await
+            .unwrap();
+
+        let mut query = sqlx::QueryBuilder::new(r#"DELETE FROM tblaccounts WHERE id = "#);
+        query.push_bind(id)
+            .build()
+            .execute(db.as_executor())
             .await
             .unwrap();
 

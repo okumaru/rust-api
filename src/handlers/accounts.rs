@@ -94,7 +94,6 @@ impl<'a> AccountHandler<'a> {
             &new_acc.updated_at,
         );
 
-        // let data = vec!["foo", "bar"];
         let res = match serde_json::to_string(&account) {
             Ok(json) => Response::builder()
                 .header(header::CONTENT_TYPE, "application/json")
@@ -123,7 +122,33 @@ impl<'a> AccountHandler<'a> {
             &update_acc.updated_at,
         );
 
-        // let data = vec!["foo", "bar"];
+        let res = match serde_json::to_string(&account) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(INTERNAL_SERVER_ERROR.into())
+                .unwrap(),
+        };
+        Ok(res)
+    }
+
+    async fn delete(&mut self) -> Result<Response<Body>> { 
+
+        let query_id = req_query_id(self.request);
+        let delete_acc = self.account_repo.account_delete(query_id).await?;
+
+        let account = new_account(
+            &delete_acc.id, 
+            &delete_acc.name, 
+            &delete_acc.description, 
+            &delete_acc.balance,
+            &delete_acc.created_at,
+            &delete_acc.updated_at,
+        );
+
         let res = match serde_json::to_string(&account) {
             Ok(json) => Response::builder()
                 .header(header::CONTENT_TYPE, "application/json")
@@ -155,7 +180,7 @@ pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
         (&Method::GET, false) => account_handler.detail().await,
         (&Method::PUT, true) => account_handler.add(body).await,
         (&Method::POST, false) => account_handler.update(body).await,
-        // &Method::DELETE => api_del_accounts(req).await,
+        (&Method::DELETE, false) => account_handler.delete().await,
 
         // 
         _ => {
