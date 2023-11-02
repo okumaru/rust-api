@@ -1,5 +1,6 @@
 
 use crate::handlers::accounts as accounts_handlers;
+use crate::handlers::trx_cats as trx_cats_handlers;
 
 use std::collections::HashMap;
 use hyper::client::HttpConnector;
@@ -9,8 +10,8 @@ type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;
 
 pub mod accounts;
+pub mod trx_cats;
 // pub mod trxs;
-// pub mod trx_cats;
 
 static INDEX: &[u8] = b"test";
 static NOTFOUND: &[u8] = b"Not Found";
@@ -28,8 +29,8 @@ pub async fn handler(
 
     match req.uri().path() {
         "/accounts" => accounts_handlers::handler(req).await,
+        "/trx_cats" => trx_cats_handlers::handler(req).await,
         // "/trxs" => api_post_response(req).await,
-        // "/trx_cats" => api_get_response().await,
         _ => {
             // Return 404 not found response.
             Ok(Response::builder()

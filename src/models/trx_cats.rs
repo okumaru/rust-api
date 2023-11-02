@@ -5,7 +5,7 @@ use sqlx::types::chrono;
 
 #[derive(Debug, FromRow, Deserialize, Serialize)]
 pub struct TrxCatsModel {
-    pub id: u8,
+    pub id: i32,
     pub name: String,
     pub description: Option<String>,
     #[serde(rename = "createdAt")]

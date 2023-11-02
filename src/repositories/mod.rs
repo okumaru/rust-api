@@ -1,5 +1,6 @@
 
 pub mod accounts;
+pub mod trx_cats;
 
 pub trait Executor: Send + Sync {
   type Executor<'this>: Send + Sync + sqlx::MySqlExecutor<'this>;
