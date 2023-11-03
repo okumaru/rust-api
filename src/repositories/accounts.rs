@@ -1,6 +1,6 @@
 
 use crate::models::accounts::{ ExistAccount, NewAccount, UpdateAccount };
-use crate::repositories::Executor;
+use crate::repositories::{ Executor, UpdateQuery };
 
 use futures_util::{future::BoxFuture, FutureExt};
 use sqlx::{MySql, MySqlPool};
@@ -129,7 +129,7 @@ impl<E: 'static + Executor> AccountTrait for AccountRepo<E> {
     }
 }
 
-fn query_list_accounts<'a>(
+pub fn query_list_accounts<'a>(
     db: &'a mut impl Executor,
 ) -> BoxFuture<'a, Vec<ExistAccount>> {
     async move {
@@ -146,7 +146,7 @@ fn query_list_accounts<'a>(
     .boxed()
 }
 
-fn query_detail_account<'a>(
+pub fn query_detail_account<'a>(
     db: &'a mut impl Executor,
     id: i32
 ) -> BoxFuture<'a, ExistAccount> {
@@ -165,7 +165,7 @@ fn query_detail_account<'a>(
     .boxed()
 }
 
-fn query_add_account<'a>(
+pub fn query_add_account<'a>(
     db: &'a mut impl Executor,
     account: NewAccount,
 ) -> BoxFuture<'a, ExistAccount> {
@@ -205,12 +205,7 @@ fn query_add_account<'a>(
     .boxed()
 }
 
-struct UpdateQuery {
-    key: String,
-    value: String,
-}
-
-fn query_update_account<'a>(
+pub fn query_update_account<'a>(
     db: &'a mut impl Executor,
     id: i32,
     account: UpdateAccount,
@@ -269,7 +264,7 @@ fn query_update_account<'a>(
     .boxed()
 }
 
-fn query_delete_account<'a>(
+pub fn query_delete_account<'a>(
     db: &'a mut impl Executor,
     id: i32,
 ) -> BoxFuture<'a, ExistAccount> {

@@ -20,5 +20,6 @@ futures-util = "0.3.28"
 url = "2.4.1"
 bigdecimal = "0.4.2"
 sqlx = { version = "0.7.2", features = [ "mysql", "runtime-tokio", "uuid", "chrono", "bigdecimal" ] }
+sqlx-mysql = "0.7.2"
 dotenv_codegen = "0.15.0"
 num-bigint = "0.4.4"

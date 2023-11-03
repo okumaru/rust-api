@@ -1,3 +1,6 @@
+
+use crate::models::bigdecimal_to_int;
+
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use sqlx::FromRow;
@@ -30,14 +33,14 @@ pub struct ExistAccount {
 pub struct NewAccount {
     pub name: String,
     pub description: Option<String>,
-    pub balance: i32,
+    pub balance: i64,
 }
 
 #[derive(Debug, Default, Clone, FromRow, Deserialize, Serialize)]
 pub struct UpdateAccount {
     pub name: Option<String>,
     pub description: Option<String>,
-    pub balance: Option<i32>,
+    pub balance: Option<i64>,
 }
 
 pub fn new_account(
@@ -49,14 +52,13 @@ pub fn new_account(
     updated_at: &DateTime<Utc>,
 ) -> AccountModel {
 
-    let new_balance = balance.clone().into_bigint_and_exponent();
-    let int_balance = &new_balance.0.to_string().parse::<i64>().unwrap();
+    let int_balance = bigdecimal_to_int(balance.clone());
 
     AccountModel { 
         id: *id, 
         name: name.to_string(), 
         description: description.clone(), 
-        balance: *int_balance,
+        balance: int_balance,
         created_at: *created_at,
         updated_at: *updated_at,
     }

@@ -1,5 +1,9 @@
 
-use std::env;
+use crate::handlers::req_query_id;
+use crate::models::bigdecimal_to_int;
+use crate::models::trxs::{ TrxModel, NewTrx, UpdateTrx };
+use crate::repositories::trxs::{TrxRepo, TrxTrait};
+
 use sqlx::mysql::MySqlPool;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
 
@@ -9,87 +13,187 @@ type Result<T> = std::result::Result<T, GenericError>;
 static INTERNAL_SERVER_ERROR: &[u8] = b"Internal Server Error";
 static NOTFOUND: &[u8] = b"Not Found";
 
-async fn api_get_trxs(
-    _pool: &MySqlPool,
-) -> Result<Response<Body>> {
-    let data = vec!["foo", "bar"];
-    let res = match serde_json::to_string(&data) {
-        Ok(json) => Response::builder()
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(json))
-            .unwrap(),
-        Err(_) => Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(INTERNAL_SERVER_ERROR.into())
-            .unwrap(),
-    };
-    Ok(res)
+pub struct TrxHandler<'a>{
+    trx_repo: TrxRepo,
+    request: &'a Request<Body>,
 }
 
-// async fn api_put_trxs(
-//     req: Request<Body>,
-// ) -> Result<Response<Body>> {
-//     let data = vec!["foo", "bar"];
-//     let res = match serde_json::to_string(&data) {
-//         Ok(json) => Response::builder()
-//             .header(header::CONTENT_TYPE, "application/json")
-//             .body(Body::from(json))
-//             .unwrap(),
-//         Err(_) => Response::builder()
-//             .status(StatusCode::INTERNAL_SERVER_ERROR)
-//             .body(INTERNAL_SERVER_ERROR.into())
-//             .unwrap(),
-//     };
-//     Ok(res)
-// }
+impl<'a> TrxHandler<'a> {
+    pub fn new(req: &'a Request<Body>, pool: MySqlPool) -> Self {
+        Self { 
+            trx_repo: TrxRepo::new(pool),
+            request: req,
+        }
+    }
 
-// async fn api_post_trxs(
-//     req: Request<Body>,
-// ) -> Result<Response<Body>> {
-//     let data = vec!["foo", "bar"];
-//     let res = match serde_json::to_string(&data) {
-//         Ok(json) => Response::builder()
-//             .header(header::CONTENT_TYPE, "application/json")
-//             .body(Body::from(json))
-//             .unwrap(),
-//         Err(_) => Response::builder()
-//             .status(StatusCode::INTERNAL_SERVER_ERROR)
-//             .body(INTERNAL_SERVER_ERROR.into())
-//             .unwrap(),
-//     };
-//     Ok(res)
-// }
+    async fn list(&mut self) -> Result<Response<Body>> {
 
-// async fn api_delete_trxs(
-//     req: Request<Body>,
-// ) -> Result<Response<Body>> {
-//     let data = vec!["foo", "bar"];
-//     let res = match serde_json::to_string(&data) {
-//         Ok(json) => Response::builder()
-//             .header(header::CONTENT_TYPE, "application/json")
-//             .body(Body::from(json))
-//             .unwrap(),
-//         Err(_) => Response::builder()
-//             .status(StatusCode::INTERNAL_SERVER_ERROR)
-//             .body(INTERNAL_SERVER_ERROR.into())
-//             .unwrap(),
-//     };
-//     Ok(res)
-// }
+        let datas = self.trx_repo.trxs_list().await?;
+        let trxs: Vec<TrxModel> = datas.iter().map(|trx| TrxModel {
+            id: trx.id,
+            credit: bigdecimal_to_int(trx.credit.clone()),
+            debit: bigdecimal_to_int(trx.debit.clone()),
+            description: trx.description.clone(),
+            balance_before: bigdecimal_to_int(trx.balance_before.clone()),
+            balance_after: bigdecimal_to_int(trx.balance_after.clone()),
+            created_at: trx.created_at,
+            updated_at: trx.updated_at,
+            accountid: trx.accountid,
+            categoryid: trx.categoryid,
+        }).collect();
 
-pub async fn trxs_handler(
-    // pool: &MySqlPool,
-    req: Request<Body>,
-    // client: Client<HttpConnector>,
-) -> Result<Response<Body>> {
+        let res = match serde_json::to_string(&trxs) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(INTERNAL_SERVER_ERROR.into())
+                .unwrap(),
+        };
+        Ok(res)
+    }
 
-    let pool = MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
+    async fn detail(&mut self) -> Result<Response<Body>> { 
 
-    match req.method() {
-        &Method::GET => api_get_trxs(&pool).await,
-        // &Method::PUT => api_put_trxs(req).await,
-        // &Method::POST => api_post_trxs(req).await,
-        // &Method::DELETE => api_delete_trxs(req).await,
+        let query_id = req_query_id(self.request);
+        let data = self.trx_repo.trx_detail(query_id).await?;
+
+        let trx = TrxModel {
+            id: data.id,
+            credit: bigdecimal_to_int(data.credit),
+            debit: bigdecimal_to_int(data.debit),
+            description: data.description,
+            balance_before: bigdecimal_to_int(data.balance_before),
+            balance_after: bigdecimal_to_int(data.balance_after),
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            accountid: data.accountid,
+            categoryid: data.categoryid,
+        };
+
+        let res = match serde_json::to_string(&trx) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(INTERNAL_SERVER_ERROR.into())
+                .unwrap(),
+        };
+        Ok(res)
+    }
+
+    async fn add(&mut self, body: &str) -> Result<Response<Body>> { 
+
+        let data: NewTrx = serde_json::from_str(body)?;
+        let new_trx = self.trx_repo.trx_add(data.clone()).await?;
+
+        let trx = TrxModel {
+            id: new_trx.id,
+            credit: bigdecimal_to_int(new_trx.credit),
+            debit: bigdecimal_to_int(new_trx.debit),
+            description: new_trx.description,
+            balance_before: bigdecimal_to_int(new_trx.balance_before),
+            balance_after: bigdecimal_to_int(new_trx.balance_after),
+            created_at: new_trx.created_at,
+            updated_at: new_trx.updated_at,
+            accountid: new_trx.accountid,
+            categoryid: new_trx.categoryid,
+        };
+
+        let res = match serde_json::to_string(&trx) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(INTERNAL_SERVER_ERROR.into())
+                .unwrap(),
+        };
+        Ok(res)
+    }
+
+    // async fn update(&mut self, body: &str) -> Result<Response<Body>> { 
+
+    //     let query_id = req_query_id(self.request);
+    //     let data: UpdateTrxCat = serde_json::from_str(body)?;
+    //     let update_cat = self.trx_cat_repo.trx_cats_update(query_id, data.clone()).await?;
+
+    //     let cat = TrxCatsModel {
+    //         id: update_cat.id, 
+    //         name: update_cat.name, 
+    //         description: update_cat.description, 
+    //         created_at: update_cat.created_at,
+    //         updated_at: update_cat.updated_at,
+    //     };
+
+    //     let res = match serde_json::to_string(&cat) {
+    //         Ok(json) => Response::builder()
+    //             .header(header::CONTENT_TYPE, "application/json")
+    //             .body(Body::from(json))
+    //             .unwrap(),
+    //         Err(_) => Response::builder()
+    //             .status(StatusCode::INTERNAL_SERVER_ERROR)
+    //             .body(INTERNAL_SERVER_ERROR.into())
+    //             .unwrap(),
+    //     };
+    //     Ok(res)
+    // }
+
+    async fn delete(&mut self) -> Result<Response<Body>> { 
+
+        let query_id = req_query_id(self.request);
+        let delete_trx = self.trx_repo.trx_delete(query_id).await?;
+
+        let trx = TrxModel {
+            id: delete_trx.id,
+            credit: bigdecimal_to_int(delete_trx.credit),
+            debit: bigdecimal_to_int(delete_trx.debit),
+            description: delete_trx.description,
+            balance_before: bigdecimal_to_int(delete_trx.balance_before),
+            balance_after: bigdecimal_to_int(delete_trx.balance_after),
+            created_at: delete_trx.created_at,
+            updated_at: delete_trx.updated_at,
+            accountid: delete_trx.accountid,
+            categoryid: delete_trx.categoryid,
+        };
+
+        let res = match serde_json::to_string(&trx) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(INTERNAL_SERVER_ERROR.into())
+                .unwrap(),
+        };
+        Ok(res)
+    }
+}
+
+pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
+
+    let pool = MySqlPool::connect("mysql://root:local@localhost:3306/sohfin").await?;
+
+    let (parts, body) = req.into_parts();
+    let body_bytes = hyper::body::to_bytes(body).await.unwrap();
+    let body = std::str::from_utf8(&body_bytes).unwrap();
+    
+    let request: hyper::Request<Body> = Request::from_parts(parts, body_bytes.clone().into());
+    let mut trx_handler = TrxHandler::new(&request, pool);
+
+    match (request.method(), request.uri().query().is_none()) {
+
+        (&Method::GET, true) => trx_handler.list().await,
+        (&Method::GET, false) => trx_handler.detail().await,
+        (&Method::PUT, true) => trx_handler.add(body).await,
+        // (&Method::POST, false) => trx_handler.update(body).await,
+        (&Method::DELETE, false) => trx_handler.delete().await,
 
         // 
         _ => {
@@ -99,7 +203,7 @@ pub async fn trxs_handler(
                 .body(NOTFOUND.into())
                 .unwrap())
         }
-            
+        
     }
 
 }

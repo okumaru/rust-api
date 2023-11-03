@@ -1,6 +1,6 @@
 
 use crate::models::trx_cats::{ ExistTrxCat, NewTrxCat, UpdateTrxCat };
-use crate::repositories::Executor;
+use crate::repositories::{ Executor, UpdateQuery };
 
 use futures_util::{future::BoxFuture, FutureExt};
 use sqlx::{MySql, MySqlPool};
@@ -202,11 +202,6 @@ fn query_add_trx_cats<'a>(
         trx_cat
     }
     .boxed()
-}
-
-struct UpdateQuery {
-    key: String,
-    value: String,
 }
 
 fn query_update_trx_cats<'a>(

@@ -1,6 +1,14 @@
 
+use chrono::{DateTime, Utc};
+
 pub mod accounts;
 pub mod trx_cats;
+pub mod trxs;
+
+pub struct UpdateQuery {
+  key: String,
+  value: String,
+}
 
 pub trait Executor: Send + Sync {
   type Executor<'this>: Send + Sync + sqlx::MySqlExecutor<'this>;
