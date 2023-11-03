@@ -117,32 +117,37 @@ impl<'a> TrxHandler<'a> {
         Ok(res)
     }
 
-    // async fn update(&mut self, body: &str) -> Result<Response<Body>> { 
+    async fn update(&mut self, body: &str) -> Result<Response<Body>> { 
 
-    //     let query_id = req_query_id(self.request);
-    //     let data: UpdateTrxCat = serde_json::from_str(body)?;
-    //     let update_cat = self.trx_cat_repo.trx_cats_update(query_id, data.clone()).await?;
+        let query_id = req_query_id(self.request);
+        let data: UpdateTrx = serde_json::from_str(body)?;
+        let update_trx = self.trx_repo.trx_update(query_id, data.clone()).await?;
 
-    //     let cat = TrxCatsModel {
-    //         id: update_cat.id, 
-    //         name: update_cat.name, 
-    //         description: update_cat.description, 
-    //         created_at: update_cat.created_at,
-    //         updated_at: update_cat.updated_at,
-    //     };
+        let trx = TrxModel {
+            id: update_trx.id,
+            credit: bigdecimal_to_int(update_trx.credit),
+            debit: bigdecimal_to_int(update_trx.debit),
+            description: update_trx.description,
+            balance_before: bigdecimal_to_int(update_trx.balance_before),
+            balance_after: bigdecimal_to_int(update_trx.balance_after),
+            created_at: update_trx.created_at,
+            updated_at: update_trx.updated_at,
+            accountid: update_trx.accountid,
+            categoryid: update_trx.categoryid,
+        };
 
-    //     let res = match serde_json::to_string(&cat) {
-    //         Ok(json) => Response::builder()
-    //             .header(header::CONTENT_TYPE, "application/json")
-    //             .body(Body::from(json))
-    //             .unwrap(),
-    //         Err(_) => Response::builder()
-    //             .status(StatusCode::INTERNAL_SERVER_ERROR)
-    //             .body(INTERNAL_SERVER_ERROR.into())
-    //             .unwrap(),
-    //     };
-    //     Ok(res)
-    // }
+        let res = match serde_json::to_string(&trx) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(INTERNAL_SERVER_ERROR.into())
+                .unwrap(),
+        };
+        Ok(res)
+    }
 
     async fn delete(&mut self) -> Result<Response<Body>> { 
 
@@ -192,7 +197,7 @@ pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
         (&Method::GET, true) => trx_handler.list().await,
         (&Method::GET, false) => trx_handler.detail().await,
         (&Method::PUT, true) => trx_handler.add(body).await,
-        // (&Method::POST, false) => trx_handler.update(body).await,
+        (&Method::POST, false) => trx_handler.update(body).await,
         (&Method::DELETE, false) => trx_handler.delete().await,
 
         // 

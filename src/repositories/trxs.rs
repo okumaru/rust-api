@@ -1,14 +1,11 @@
 
 use crate::models::bigdecimal_to_int;
-use crate::models::accounts::{ UpdateAccount };
-use crate::models::trxs::{ TrxModel, ExistTrx, NewTrx, AddTrx, UpdateTrx };
+use crate::models::trxs::{ ExistTrx, NewTrx, AddTrx, UpdateTrx };
 use crate::repositories::{ Executor, UpdateQuery };
 use crate::repositories::accounts;
 
 use futures_util::{future::BoxFuture, FutureExt};
 use sqlx::{MySql, MySqlPool};
-// use sqlx::database::Database::QueryResult;
-// sqlx::database::Database
 use sqlx_mysql::MySqlQueryResult;
 
 #[async_trait::async_trait]
@@ -39,11 +36,11 @@ pub trait TrxTrait {
         &mut self,
         account: NewTrx,
     ) -> Result<ExistTrx, Box<dyn std::error::Error + Send + Sync + 'static>>;
-    // async fn trx_update(
-    //     &mut self,
-    //     id: i32,
-    //     account: UpdateTrx,
-    // ) -> Result<TrxModel, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    async fn trx_update(
+        &mut self,
+        id: i32,
+        account: UpdateTrx,
+    ) -> Result<ExistTrx, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_delete(
         &mut self,
         id: i32,
@@ -140,15 +137,44 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
         Ok(trx)
     }
 
-    // async fn trx_update(
-    //     &mut self,
-    //     id: i32,
-    //     trx: UpdateTrx,
-    // ) -> Result<ExistTrx, Box<dyn std::error::Error + Send + Sync + 'static>> {
-    //     let trx = query_update_trx(&mut self.db, id, trx).await;
+    async fn trx_update(
+        &mut self,
+        id: i32,
+        trx: UpdateTrx,
+    ) -> Result<ExistTrx, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
-    //     Ok(trx)
-    // }
+        // trx detail
+        let exist_trx = query_detail_trx(&mut self.db, id).await;
+
+        if trx.debit.is_none() == false && trx.credit.is_none() == false {
+
+            let acc_id = exist_trx.accountid;
+            let exist_amount = bigdecimal_to_int(&exist_trx.credit - &exist_trx.debit);
+            let new_amount = trx.credit.unwrap() - trx.debit.unwrap();
+
+            if exist_amount != new_amount {
+
+                let amount = new_amount - exist_amount;
+
+                // update trx after & bef balance
+                let _ = update_curr_trx_balance(&mut self.db, id, acc_id.clone(), amount).await;
+                let _ = update_trx_balance(&mut self.db, id, acc_id.clone(), amount).await;
+
+                // update account balance
+                let _ = update_acc_balance(&mut self.db, acc_id, amount).await;
+
+            }
+
+        }
+
+        // update trx credit, debit, desc, categoryid
+        let _ = query_update_trx(&mut self.db, id, trx).await;
+
+        // trx detail
+        let trx = query_detail_trx(&mut self.db, id).await;
+
+        Ok(trx)
+    }
 
     async fn trx_delete(
         &mut self,
@@ -281,9 +307,9 @@ fn update_trx_balance<'a>(
     async move {
 
         let mut query = sqlx::QueryBuilder::new(r#"UPDATE tbltransactions SET "#);
-        query.push(" balance_before = balance_before + ")
+        query.push("balance_after = balance_after + ")
             .push_bind(amount)
-            .push(", balance_after = balance_after + ")
+            .push(", balance_before = balance_before + ")
             .push_bind(amount)
             .push(" WHERE accountid = ")
             .push_bind(acc_id)
@@ -301,57 +327,90 @@ fn update_trx_balance<'a>(
     .boxed()
 }
 
-// fn query_update_trx<'a>(
-//     db: &'a mut impl Executor,
-//     id: i32,
-//     trx: UpdateTrx,
-// ) -> BoxFuture<'a, MySqlQueryResult> {
-//     async move {
+fn update_curr_trx_balance<'a>(
+    db: &'a mut impl Executor,
+    id: i32,
+    acc_id: i32,
+    amount: i64,
+) -> BoxFuture<'a, MySqlQueryResult> {
+    async move {
 
-//         let mut query = sqlx::QueryBuilder::new(r#"UPDATE tbltransactions SET "#);
-//         let mut updates: Vec<UpdateQuery> = Vec::new();
+        let mut query = sqlx::QueryBuilder::new(r#"UPDATE tbltransactions SET "#);
+        query.push("balance_after = balance_after + ")
+            .push_bind(amount)
+            .push(" WHERE accountid = ")
+            .push_bind(acc_id)
+            .push(" AND id = ")
+            .push_bind(id);
 
-//         if cat.name.is_some() {
-//             updates.push(UpdateQuery {
-//                 key: "name".to_string(),
-//                 value: cat.name.unwrap().to_string(),
-//             })
-//         }
+        let res = query
+            .build()
+            .execute(db.as_executor())
+            .await
+            .unwrap();
 
-//         if cat.description.is_some() {
-//             updates.push(UpdateQuery {
-//                 key: "description".to_string(),
-//                 value: cat.description.unwrap().to_string(),
-//             })
-//         }
+        res
+    }
+    .boxed()
+}
 
-//         let mut separated = query.separated(", ");
-//         for update in updates.iter() {
-//             separated.push(update.key.clone())
-//                 .push_unseparated(" = ")
-//                 .push_bind_unseparated(update.value.clone());
-//         }
+fn query_update_trx<'a>(
+    db: &'a mut impl Executor,
+    id: i32,
+    trx: UpdateTrx,
+) -> BoxFuture<'a, MySqlQueryResult> {
+    async move {
 
-//         separated.push_unseparated(" WHERE id = ")
-//             .push_bind_unseparated(id);
+        let mut query = sqlx::QueryBuilder::new(r#"UPDATE tbltransactions SET "#);
+        let mut updates: Vec<UpdateQuery> = Vec::new();
+
+        if trx.credit.is_some() {
+            updates.push(UpdateQuery {
+                key: "credit".to_string(),
+                value: trx.credit.unwrap().to_string(),
+            })
+        }
+
+        if trx.debit.is_some() {
+            updates.push(UpdateQuery {
+                key: "debit".to_string(),
+                value: trx.debit.unwrap().to_string(),
+            })
+        }
+
+        if trx.description.is_some() {
+            updates.push(UpdateQuery {
+                key: "description".to_string(),
+                value: trx.description.unwrap().to_string(),
+            })
+        }
+
+        if trx.categoryid.is_some() {
+            updates.push(UpdateQuery {
+                key: "categoryid".to_string(),
+                value: trx.categoryid.unwrap().to_string(),
+            })
+        }
+
+        let mut separated = query.separated(", ");
+        for update in updates.iter() {
+            separated.push(update.key.clone())
+                .push_unseparated(" = ")
+                .push_bind_unseparated(update.value.clone());
+        }
+
+        separated.push_unseparated(" WHERE id = ")
+            .push_bind_unseparated(id);
         
-//         query.build()
-//             .execute(db.as_executor())
-//             .await
-//             .unwrap();
+        let res = query.build()
+            .execute(db.as_executor())
+            .await
+            .unwrap();
 
-//         let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tbltransactions WHERE id = "#);
-//         let trx = query
-//             .push_bind(id)
-//             .build_query_as::<ExistTrx>()
-//             .fetch_one(db.as_executor())
-//             .await
-//             .unwrap();
-
-//             trx
-//     }
-//     .boxed()
-// }
+        res
+    }
+    .boxed()
+}
 
 fn query_delete_trx<'a>(
     db: &'a mut impl Executor,
