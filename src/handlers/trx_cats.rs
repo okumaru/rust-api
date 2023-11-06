@@ -3,6 +3,7 @@ use crate::handlers::req_query_id;
 use crate::models::trx_cats::{ TrxCatsModel, NewTrxCat, UpdateTrxCat };
 use crate::repositories::trx_cats::{TrxCatRepo, TrxCatTrait};
 
+use std::env;
 use sqlx::mysql::MySqlPool;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
 
@@ -156,8 +157,7 @@ impl<'a> TrxCatHandler<'a> {
 }
 
 pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
-
-    let pool = MySqlPool::connect("mysql://root:local@localhost:3306/sohfin").await?;
+    let pool = MySqlPool::connect(&env::var("DATABASE_URL").unwrap()).await?;
 
     let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await.unwrap();

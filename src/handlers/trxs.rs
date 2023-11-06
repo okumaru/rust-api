@@ -4,6 +4,7 @@ use crate::models::bigdecimal_to_int;
 use crate::models::trxs::{ TrxModel, NewTrx, UpdateTrx };
 use crate::repositories::trxs::{TrxRepo, TrxTrait};
 
+use std::env;
 use sqlx::mysql::MySqlPool;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
 
@@ -182,8 +183,7 @@ impl<'a> TrxHandler<'a> {
 }
 
 pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
-
-    let pool = MySqlPool::connect("mysql://root:local@localhost:3306/sohfin").await?;
+    let pool = MySqlPool::connect(&env::var("DATABASE_URL").unwrap()).await?;
 
     let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await.unwrap();
