@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::FromRow;
 use sqlx::types::chrono;
 
