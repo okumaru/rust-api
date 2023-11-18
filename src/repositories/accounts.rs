@@ -173,7 +173,7 @@ pub fn query_add_account<'a>(
 
         let account_name = account.name;
         let account_balance = account.balance.to_string();
-        let account_star = account.star.to_string();
+        let account_star = Into::<i32>::into(account.star).to_string();
         let account_type = account.r#type.to_string();
         let account_desc: String = match account.description { 
             Some(_) => account.description.unwrap().to_string(),
@@ -234,7 +234,7 @@ pub fn query_update_account<'a>(
         if account.star.is_some() {
             updates.push(UpdateQuery {
                 key: "star".to_string(),
-                value: account.star.unwrap().to_string(),
+                value: Into::<i32>::into(account.star.unwrap()).to_string(),
             })
         }
 
