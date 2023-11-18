@@ -173,12 +173,14 @@ pub fn query_add_account<'a>(
 
         let account_name = account.name;
         let account_balance = account.balance.to_string();
+        let account_star = account.star.to_string();
+        let account_type = account.r#type.to_string();
         let account_desc: String = match account.description { 
             Some(_) => account.description.unwrap().to_string(),
             None => "".to_string()
         };
-        let values = vec![account_name, account_desc, account_balance];
-        let mut query = sqlx::QueryBuilder::new(r#"INSERT INTO tblaccounts (name, description, balance) VALUES ("#);
+        let values = vec![account_name, account_desc, account_star, account_type, account_balance];
+        let mut query = sqlx::QueryBuilder::new(r#"INSERT INTO tblaccounts (name, description, star, type, balance) VALUES ("#);
 
         let mut separated = query.separated(", ");
         for value in values.iter() {
@@ -226,6 +228,20 @@ pub fn query_update_account<'a>(
             updates.push(UpdateQuery {
                 key: "description".to_string(),
                 value: account.description.unwrap().to_string(),
+            })
+        }
+
+        if account.star.is_some() {
+            updates.push(UpdateQuery {
+                key: "star".to_string(),
+                value: account.star.unwrap().to_string(),
+            })
+        }
+
+        if account.r#type.is_some() {
+            updates.push(UpdateQuery {
+                key: "type".to_string(),
+                value: account.r#type.unwrap().to_string(),
             })
         }
 
