@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::FromRow;
 use sqlx::types::BigDecimal;
-use sqlx::types::chrono;
 
 #[derive(Debug, FromRow, Deserialize, Serialize)]
 pub struct AccountModel {
