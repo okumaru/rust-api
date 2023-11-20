@@ -2,6 +2,7 @@
 use sqlx::types::BigDecimal;
 
 pub mod accounts;
+pub mod cat_types;
 pub mod trx_cats;
 pub mod trxs;
 
