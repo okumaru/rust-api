@@ -11,7 +11,9 @@ pub struct TrxModel {
     pub description: Option<String>,
     pub balance_before: i64,
     pub balance_after: i64,
+    #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
+    #[serde(rename = "updatedAt")]
     pub updated_at: DateTime<Utc>,
     pub accountid: i32,
     pub categoryid: i32,
