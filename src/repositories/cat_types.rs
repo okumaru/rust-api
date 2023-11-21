@@ -194,12 +194,10 @@ fn query_add_cat_type<'a>(
         let values = vec![
             cat_type.r#type.to_string(),
             desc,
-            cat_type.target.to_string(),
-            cat_type.available.to_string(),
             cat_type.icon.to_string(),
         ];
 
-        let mut query = sqlx::QueryBuilder::new(r#"INSERT INTO tblcategorytypes (type, description, target, available, icon) VALUES ("#);
+        let mut query = sqlx::QueryBuilder::new(r#"INSERT INTO tblcategorytypes (type, description, icon) VALUES ("#);
 
         let mut separated = query.separated(", ");
         for value in values.iter() {
@@ -239,20 +237,6 @@ fn query_update_cat_type<'a>(
             updates.push(UpdateQuery {
                 key: "description".to_string(),
                 value: cat_type.description.unwrap().to_string(),
-            })
-        }
-
-        if cat_type.target.is_some() {
-            updates.push(UpdateQuery {
-                key: "target".to_string(),
-                value: cat_type.target.unwrap().to_string(),
-            })
-        }
-
-        if cat_type.available.is_some() {
-            updates.push(UpdateQuery {
-                key: "available".to_string(),
-                value: cat_type.available.unwrap().to_string(),
             })
         }
 

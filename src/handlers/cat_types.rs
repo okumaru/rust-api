@@ -1,6 +1,5 @@
 
 use crate::handlers::req_query_id;
-use crate::models::bigdecimal_to_int;
 use crate::models::cat_types::{ CatTypeModel, AddCatType, UpdateCatType };
 use crate::repositories::cat_types::{CatTypeRepo, CatTypeTrait};
 
@@ -34,8 +33,6 @@ impl<'a> CatTypeHandler<'a> {
             id: data.id, 
             r#type: data.r#type.clone(), 
             description: data.description.clone(),  
-            target: bigdecimal_to_int(data.target.clone()),  
-            available: bigdecimal_to_int(data.available.clone()),  
             icon: data.icon.clone(),  
             created_at: data.created_at,
             updated_at: data.updated_at,
@@ -63,8 +60,6 @@ impl<'a> CatTypeHandler<'a> {
             id: data.id, 
             r#type: data.r#type.clone(), 
             description: data.description.clone(),  
-            target: bigdecimal_to_int(data.target.clone()),  
-            available: bigdecimal_to_int(data.available.clone()),  
             icon: data.icon.clone(),  
             created_at: data.created_at,
             updated_at: data.updated_at,
@@ -92,8 +87,6 @@ impl<'a> CatTypeHandler<'a> {
             id: new_type.id, 
             r#type: new_type.r#type.clone(), 
             description: new_type.description.clone(),  
-            target: bigdecimal_to_int(new_type.target.clone()),  
-            available: bigdecimal_to_int(new_type.available.clone()),  
             icon: new_type.icon.clone(),  
             created_at: new_type.created_at,
             updated_at: new_type.updated_at,
@@ -122,8 +115,6 @@ impl<'a> CatTypeHandler<'a> {
             id: update_type.id, 
             r#type: update_type.r#type.clone(), 
             description: update_type.description.clone(),  
-            target: bigdecimal_to_int(update_type.target.clone()),  
-            available: bigdecimal_to_int(update_type.available.clone()),  
             icon: update_type.icon.clone(),  
             created_at: update_type.created_at,
             updated_at: update_type.updated_at,
@@ -151,8 +142,6 @@ impl<'a> CatTypeHandler<'a> {
             id: delete_cat.id, 
             r#type: delete_cat.r#type.clone(), 
             description: delete_cat.description.clone(),  
-            target: bigdecimal_to_int(delete_cat.target.clone()),  
-            available: bigdecimal_to_int(delete_cat.available.clone()),  
             icon: delete_cat.icon.clone(),  
             created_at: delete_cat.created_at,
             updated_at: delete_cat.updated_at,
