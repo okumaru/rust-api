@@ -1,7 +1,7 @@
 
 use crate::handlers::req_query_id;
 use crate::models::bigdecimal_to_int;
-use crate::models::cat_types::{ CatTypeModel, AddCatType, UpdateCatType };
+use crate::models::cat_types::{ CatTypeModel, CatTypeModelWithBudget, AddCatType, UpdateCatType };
 use crate::repositories::cat_types::{CatTypeRepo, CatTypeTrait};
 
 use std::env;
@@ -29,17 +29,30 @@ impl<'a> CatTypeHandler<'a> {
 
     async fn list(&mut self) -> Result<Response<Body>> {
 
+        let mut types: Vec<CatTypeModelWithBudget> = Vec::new();
+
         let datas = self.cat_type_repo.cat_types_list().await?;
-        let types: Vec<CatTypeModel> = datas.iter().map(|data| CatTypeModel {
-            id: data.id, 
-            r#type: data.r#type.clone(), 
-            description: data.description.clone(),  
-            target: bigdecimal_to_int(data.target.clone()),  
-            available: bigdecimal_to_int(data.available.clone()),  
-            icon: data.icon.clone(),  
-            created_at: data.created_at,
-            updated_at: data.updated_at,
-        }).collect();
+        for data in datas.iter() {
+
+            let allocated: i64 = if data.allocated != None { bigdecimal_to_int(data.allocated.clone().unwrap()) } else { 0 };
+            let spent: i64 = if data.spent != None { bigdecimal_to_int(data.spent.clone().unwrap()) } else { 0 };
+            let available: i64 = if data.available != None { bigdecimal_to_int(data.available.clone().unwrap()) } else { 0 };
+
+            let data_type = CatTypeModelWithBudget {
+                id: data.id, 
+                r#type: data.r#type.clone(), 
+                description: data.description.clone(),  
+                icon: data.icon.clone(),  
+                created_at: data.created_at,
+                updated_at: data.updated_at,
+                allocated: allocated,
+                spent: spent,
+                available: available,
+            };
+
+            types.push(data_type);
+
+        }
 
         let res = match serde_json::to_string(&types) {
             Ok(json) => Response::builder()
@@ -59,15 +72,20 @@ impl<'a> CatTypeHandler<'a> {
         let query_id = req_query_id(self.request);
         let data = self.cat_type_repo.cat_type_detail(query_id).await?;
 
-        let cat_type = CatTypeModel {
+        let allocated: i64 = if data.allocated != None { bigdecimal_to_int(data.allocated.clone().unwrap()) } else { 0 };
+        let spent: i64 = if data.spent != None { bigdecimal_to_int(data.spent.clone().unwrap()) } else { 0 };
+        let available: i64 = if data.available != None { bigdecimal_to_int(data.available.clone().unwrap()) } else { 0 };
+
+        let cat_type = CatTypeModelWithBudget {
             id: data.id, 
             r#type: data.r#type.clone(), 
             description: data.description.clone(),  
-            target: bigdecimal_to_int(data.target.clone()),  
-            available: bigdecimal_to_int(data.available.clone()),  
             icon: data.icon.clone(),  
             created_at: data.created_at,
             updated_at: data.updated_at,
+            allocated: allocated,
+            spent: spent,
+            available: available,
         };
 
         let res = match serde_json::to_string(&cat_type) {
@@ -92,8 +110,6 @@ impl<'a> CatTypeHandler<'a> {
             id: new_type.id, 
             r#type: new_type.r#type.clone(), 
             description: new_type.description.clone(),  
-            target: bigdecimal_to_int(new_type.target.clone()),  
-            available: bigdecimal_to_int(new_type.available.clone()),  
             icon: new_type.icon.clone(),  
             created_at: new_type.created_at,
             updated_at: new_type.updated_at,
@@ -122,8 +138,6 @@ impl<'a> CatTypeHandler<'a> {
             id: update_type.id, 
             r#type: update_type.r#type.clone(), 
             description: update_type.description.clone(),  
-            target: bigdecimal_to_int(update_type.target.clone()),  
-            available: bigdecimal_to_int(update_type.available.clone()),  
             icon: update_type.icon.clone(),  
             created_at: update_type.created_at,
             updated_at: update_type.updated_at,
@@ -151,8 +165,6 @@ impl<'a> CatTypeHandler<'a> {
             id: delete_cat.id, 
             r#type: delete_cat.r#type.clone(), 
             description: delete_cat.description.clone(),  
-            target: bigdecimal_to_int(delete_cat.target.clone()),  
-            available: bigdecimal_to_int(delete_cat.available.clone()),  
             icon: delete_cat.icon.clone(),  
             created_at: delete_cat.created_at,
             updated_at: delete_cat.updated_at,

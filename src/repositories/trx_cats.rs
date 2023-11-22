@@ -1,9 +1,13 @@
 
-use crate::models::trx_cats::{ ExistTrxCat, NewTrxCat, UpdateTrxCat };
+use crate::models::trx_cats;
+use crate::models::trx_cats::{ ExistTrxCat, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat };
+use crate::models::trx_cat_budgets::{ ExistTrxCatBudget, NewTrxCatBudget };
 use crate::repositories::{ Executor, UpdateQuery };
+use crate::repositories::trx_cat_budgets;
 
 use futures_util::{future::BoxFuture, FutureExt};
 use sqlx::{MySql, MySqlPool};
+use sqlx_mysql::MySqlQueryResult;
 
 #[async_trait::async_trait]
 pub trait Trait: Send + Sync + TrxCatTrait {
@@ -24,24 +28,24 @@ pub trait TransactionTrait: Send + Sync + TrxCatTrait {
 pub trait TrxCatTrait {
     async fn trx_cats_list(
         &mut self,
-    ) -> Result<Vec<ExistTrxCat>, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<Vec<ExistTrxCatWithBudget>, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cats_detail(
         &mut self,
         id: i32,
-    ) -> Result<ExistTrxCat, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cats_add(
         &mut self,
-        account: NewTrxCat,
-    ) -> Result<ExistTrxCat, Box<dyn std::error::Error + Send + Sync + 'static>>;
+        account: AddTrxCat,
+    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cats_update(
         &mut self,
         id: i32,
         account: UpdateTrxCat,
-    ) -> Result<ExistTrxCat, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cats_delete(
         &mut self,
         id: i32,
-    ) -> Result<ExistTrxCat, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
 }
 
 #[derive(Debug, Clone)]
@@ -85,27 +89,74 @@ impl TransactionTrait for TrxCatRepo<sqlx::Transaction<'static, MySql>> {
 impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
     async fn trx_cats_list(
         &mut self,
-    ) -> Result<Vec<ExistTrxCat>, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let trx_cats = query_list_trx_cats(&mut self.db).await;
+    ) -> Result<Vec<ExistTrxCatWithBudget>, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
-        Ok(trx_cats)
+        let mut data_cats: Vec<ExistTrxCatWithBudget> = Vec::new();
+
+        let trx_cats: Vec<ExistTrxCat> = query_list_trx_cats(&mut self.db).await;
+        for cat in trx_cats.iter() {
+            
+            let id = cat.id;
+
+            // detail trx cat budget
+            let data_budget: Option<ExistTrxCatBudget> = trx_cat_budgets::query_latest_trx_cat_budget_by_catid(&mut self.db, id).await;
+            
+            let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(cat.clone(), data_budget);
+            data_cats.push(trx_cat);
+
+        }
+
+        Ok(data_cats)
     }
 
     async fn trx_cats_detail(
         &mut self,
         id: i32,
-    ) -> Result<ExistTrxCat, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let trx_cat = query_detail_trx_cats(&mut self.db, id).await;
+    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
+        // detail trx cat
+        let data_cat: ExistTrxCat = query_detail_trx_cats(&mut self.db, id).await;
+
+        // detail trx cat budget
+        let data_budget: Option<ExistTrxCatBudget> = trx_cat_budgets::query_latest_trx_cat_budget_by_catid(&mut self.db, id).await;
+        
+        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, data_budget);
         Ok(trx_cat)
     }
 
     async fn trx_cats_add(
         &mut self,
-        cat: NewTrxCat,
-    ) -> Result<ExistTrxCat, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let trx_cat = query_add_trx_cats(&mut self.db, cat).await;
+        cat: AddTrxCat,
+    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
+        let mut data_budget: Option<ExistTrxCatBudget> = None;
+
+        // add trx cat
+        let add_trx_cat = query_add_trx_cats(&mut self.db, cat.clone()).await;
+        let trx_cat_id = i32::try_from(add_trx_cat.last_insert_id()).unwrap();
+
+        if cat.budget.clone() != None {
+
+            let budget = cat.budget.clone().unwrap();
+            let add_budget = NewTrxCatBudget {
+                periode: budget.periode,
+                allocated: budget.allocated,
+                spent: budget.spent,
+                available: budget.available,
+                categoryid: trx_cat_id,
+            };
+
+            let _ = trx_cat_budgets::query_add_trx_cat_budget(&mut self.db, add_budget).await;
+            
+            // detail trx cat budget
+            data_budget = trx_cat_budgets::query_latest_trx_cat_budget_by_catid(&mut self.db, trx_cat_id).await;
+
+        }
+
+        // detail trx cat
+        let data_cat: ExistTrxCat = query_detail_trx_cats(&mut self.db, trx_cat_id).await;
+
+        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, data_budget);
         Ok(trx_cat)
     }
 
@@ -113,8 +164,15 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
         &mut self,
         id: i32,
         cat: UpdateTrxCat,
-    ) -> Result<ExistTrxCat, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let trx_cat = query_update_trx_cats(&mut self.db, id, cat).await;
+    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
+
+        // update trx cat
+        let _ = query_update_trx_cats(&mut self.db, id, cat).await;
+
+        // trx cat detail
+        let data_cat = query_detail_trx_cats(&mut self.db, id).await;
+
+        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, None);
 
         Ok(trx_cat)
     }
@@ -122,8 +180,18 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
     async fn trx_cats_delete(
         &mut self,
         id: i32,
-    ) -> Result<ExistTrxCat, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let trx_cat = query_delete_trx_cats(&mut self.db, id).await;
+    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
+
+        // trx cat detail
+        let data_cat = query_detail_trx_cats(&mut self.db, id).await;
+
+        // delete trx cat budget
+        let _ = trx_cat_budgets::query_delete_cat_budget_by_catid(&mut self.db, id).await;
+
+        // delete trx cat
+        let _ = query_delete_trx_cats(&mut self.db, id).await;
+
+        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, None);
 
         Ok(trx_cat)
     }
@@ -167,17 +235,18 @@ fn query_detail_trx_cats<'a>(
 
 fn query_add_trx_cats<'a>(
     db: &'a mut impl Executor,
-    cat: NewTrxCat,
-) -> BoxFuture<'a, ExistTrxCat> {
+    cat: AddTrxCat,
+) -> BoxFuture<'a, MySqlQueryResult> {
     async move {
 
         let cat_name = cat.name;
+        let cat_typeid = cat.typeid.to_string();
         let cat_desc: String = match cat.description { 
             Some(_) => cat.description.unwrap().to_string(),
             None => "".to_string()
         };
-        let values = vec![cat_name, cat_desc];
-        let mut query = sqlx::QueryBuilder::new(r#"INSERT INTO tbltransactioncategories (name, description) VALUES ("#);
+        let values = vec![cat_name, cat_desc, cat_typeid];
+        let mut query = sqlx::QueryBuilder::new(r#"INSERT INTO tbltransactioncategories (name, description, typeid) VALUES ("#);
 
         let mut separated = query.separated(", ");
         for value in values.iter() {
@@ -185,21 +254,13 @@ fn query_add_trx_cats<'a>(
         }
         separated.push_unseparated(") ");
 
-        let add = query
+        let res = query
             .build()
             .execute(db.as_executor())
             .await
             .unwrap();
 
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tbltransactioncategories WHERE id = "#);
-        let trx_cat = query
-            .push_bind(add.last_insert_id())
-            .build_query_as::<ExistTrxCat>()
-            .fetch_one(db.as_executor())
-            .await
-            .unwrap();
-
-        trx_cat
+        res
     }
     .boxed()
 }
@@ -208,7 +269,7 @@ fn query_update_trx_cats<'a>(
     db: &'a mut impl Executor,
     id: i32,
     cat: UpdateTrxCat,
-) -> BoxFuture<'a, ExistTrxCat> {
+) -> BoxFuture<'a, MySqlQueryResult> {
     async move {
 
         let mut query = sqlx::QueryBuilder::new(r#"UPDATE tbltransactioncategories SET "#);
@@ -235,23 +296,18 @@ fn query_update_trx_cats<'a>(
                 .push_bind_unseparated(update.value.clone());
         }
 
-        separated.push_unseparated(" WHERE id = ")
+        separated
+            .push("updated_at = current_timestamp()")
+            .push_unseparated(" WHERE id = ")
             .push_bind_unseparated(id);
         
-        query.build()
+        let res = query
+            .build()
             .execute(db.as_executor())
             .await
             .unwrap();
 
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tbltransactioncategories WHERE id = "#);
-        let trx_cat = query
-            .push_bind(id)
-            .build_query_as::<ExistTrxCat>()
-            .fetch_one(db.as_executor())
-            .await
-            .unwrap();
-
-        trx_cat
+        res
     }
     .boxed()
 }
@@ -259,25 +315,19 @@ fn query_update_trx_cats<'a>(
 fn query_delete_trx_cats<'a>(
     db: &'a mut impl Executor,
     id: i32,
-) -> BoxFuture<'a, ExistTrxCat> {
+) -> BoxFuture<'a, MySqlQueryResult> {
     async move {
 
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tbltransactioncategories WHERE id = "#);
-        let trx_cats = query
-            .push_bind(id)
-            .build_query_as::<ExistTrxCat>()
-            .fetch_one(db.as_executor())
-            .await
-            .unwrap();
-
         let mut query = sqlx::QueryBuilder::new(r#"DELETE FROM tbltransactioncategories WHERE id = "#);
-        query.push_bind(id)
+
+        let res = query
+            .push_bind(id)
             .build()
             .execute(db.as_executor())
             .await
             .unwrap();
 
-        trx_cats
+            res
     }
     .boxed()
 }

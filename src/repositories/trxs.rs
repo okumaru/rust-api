@@ -3,6 +3,7 @@ use crate::models::bigdecimal_to_int;
 use crate::models::trxs::{ ExistTrx, NewTrx, AddTrx, UpdateTrx };
 use crate::repositories::{ Executor, UpdateQuery };
 use crate::repositories::accounts;
+use crate::repositories::trx_cat_budgets;
 
 use futures_util::{future::BoxFuture, FutureExt};
 use sqlx::{MySql, MySqlPool};
@@ -113,6 +114,7 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
         let acc_balance = bigdecimal_to_int(account.balance);
         let amount = trx.credit - trx.debit;
         let acc_id = trx.accountid;
+        let cat_id = trx.categoryid;
 
         let add_trx = AddTrx {
             credit: trx.credit,
@@ -121,7 +123,7 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
             balance_before: acc_balance,
             balance_after: &acc_balance + &amount,
             accountid: acc_id.clone(),
-            categoryid: trx.categoryid,
+            categoryid: cat_id.clone(),
         };
 
         // add trx
@@ -129,7 +131,10 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
         let trx_id = i32::try_from(add.last_insert_id()).unwrap();
 
         // update account balance
-        let _ = update_acc_balance(&mut self.db, acc_id, amount).await;
+        let _ = accounts::update_acc_balance(&mut self.db, acc_id, amount).await;
+
+        // update trx cat budget current periode
+        let _ = trx_cat_budgets::query_update_trx_cat_badget(&mut self.db, cat_id, amount).await;
 
         // detail trx
         let trx = query_detail_trx(&mut self.db, trx_id).await;
@@ -149,6 +154,7 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
         if trx.debit.is_none() == false && trx.credit.is_none() == false {
 
             let acc_id = exist_trx.accountid;
+            let cat_id = exist_trx.categoryid;
             let exist_amount = bigdecimal_to_int(&exist_trx.credit - &exist_trx.debit);
             let new_amount = trx.credit.unwrap() - trx.debit.unwrap();
 
@@ -161,8 +167,10 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
                 let _ = update_trx_balance(&mut self.db, id, acc_id.clone(), amount).await;
 
                 // update account balance
-                let _ = update_acc_balance(&mut self.db, acc_id, amount).await;
+                let _ = accounts::update_acc_balance(&mut self.db, acc_id, amount).await;
 
+                // update trx cat budget current periode
+                let _ = trx_cat_budgets::query_update_trx_cat_badget(&mut self.db, cat_id, amount).await;
             }
 
         }
@@ -185,12 +193,16 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
         let trx = query_detail_trx(&mut self.db, id).await;
         let amount = bigdecimal_to_int(&trx.debit - &trx.credit);
         let acc_id = trx.accountid;
+        let cat_id = trx.categoryid;
 
         // update trx after & bef balance
         let _ = update_trx_balance(&mut self.db, id, acc_id.clone(), amount).await;
 
         // update account balance
-        let _ = update_acc_balance(&mut self.db, acc_id, amount).await;
+        let _ = accounts::update_acc_balance(&mut self.db, acc_id, amount).await;
+
+        // update trx cat budget current periode
+        let _ = trx_cat_budgets::query_update_trx_cat_badget(&mut self.db, cat_id, amount).await;
 
         // delete trx
         let _ = query_delete_trx(&mut self.db, id).await;
@@ -275,29 +287,6 @@ fn query_add_trx<'a>(
     .boxed()
 }
 
-fn update_acc_balance<'a>(
-    db: &'a mut impl Executor,
-    id: i32,
-    amount: i64,
-) -> BoxFuture<'a, MySqlQueryResult> {
-    async move {
-
-        let mut query = sqlx::QueryBuilder::new(r#"UPDATE tblaccounts SET balance = balance + "#);
-        query.push_bind(amount)
-            .push(" WHERE id = ")
-            .push_bind(id);
-
-        let res = query
-            .build()
-            .execute(db.as_executor())
-            .await
-            .unwrap();
-
-        res
-    }
-    .boxed()
-}
-
 fn update_trx_balance<'a>(
     db: &'a mut impl Executor,
     id: i32,
@@ -307,14 +296,11 @@ fn update_trx_balance<'a>(
     async move {
 
         let mut query = sqlx::QueryBuilder::new(r#"UPDATE tbltransactions SET "#);
-        query.push("balance_after = balance_after + ")
-            .push_bind(amount)
-            .push(", balance_before = balance_before + ")
-            .push_bind(amount)
-            .push(" WHERE accountid = ")
-            .push_bind(acc_id)
-            .push(" AND id > ")
-            .push_bind(id);
+        query.push("balance_after = balance_after + ").push_bind(amount)
+            .push(" , balance_before = balance_before + ").push_bind(amount)
+            .push(" , updated_at = current_timestamp() ")
+            .push(" WHERE accountid = ").push_bind(acc_id)
+            .push(" AND id > ").push_bind(id);
 
         let res = query
             .build()
@@ -336,12 +322,10 @@ fn update_curr_trx_balance<'a>(
     async move {
 
         let mut query = sqlx::QueryBuilder::new(r#"UPDATE tbltransactions SET "#);
-        query.push("balance_after = balance_after + ")
-            .push_bind(amount)
-            .push(" WHERE accountid = ")
-            .push_bind(acc_id)
-            .push(" AND id = ")
-            .push_bind(id);
+        query.push("balance_after = balance_after + ").push_bind(amount)
+            .push(" , updated_at = current_timestamp() ")
+            .push(" WHERE accountid = ").push_bind(acc_id)
+            .push(" AND id = ").push_bind(id);
 
         let res = query
             .build()
@@ -385,13 +369,6 @@ fn query_update_trx<'a>(
             })
         }
 
-        if trx.categoryid.is_some() {
-            updates.push(UpdateQuery {
-                key: "categoryid".to_string(),
-                value: trx.categoryid.unwrap().to_string(),
-            })
-        }
-
         let mut separated = query.separated(", ");
         for update in updates.iter() {
             separated.push(update.key.clone())
@@ -399,7 +376,9 @@ fn query_update_trx<'a>(
                 .push_bind_unseparated(update.value.clone());
         }
 
-        separated.push_unseparated(" WHERE id = ")
+        separated
+            .push("updated_at = current_timestamp()")
+            .push_unseparated(" WHERE id = ")
             .push_bind_unseparated(id);
         
         let res = query.build()

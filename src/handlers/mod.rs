@@ -2,6 +2,7 @@
 use crate::handlers::accounts as accounts_handlers;
 use crate::handlers::cat_types as cat_types_handlers;
 use crate::handlers::trx_cats as trx_cats_handlers;
+use crate::handlers::trx_cat_budgets as trx_cat_budgets_handlers;
 use crate::handlers::trxs as trxs_handlers;
 
 use std::collections::HashMap;
@@ -14,6 +15,7 @@ type Result<T> = std::result::Result<T, GenericError>;
 pub mod accounts;
 pub mod cat_types;
 pub mod trx_cats;
+pub mod trx_cat_budgets;
 pub mod trxs;
 
 static INDEX: &[u8] = b"test";
@@ -34,6 +36,7 @@ pub async fn handler(
         "/accounts" => accounts_handlers::handler(req).await,
         "/cat_types" => cat_types_handlers::handler(req).await,
         "/trx_cats" => trx_cats_handlers::handler(req).await,
+        "/trx_cats_budgets" => trx_cat_budgets_handlers::handler(req).await,
         "/trxs" => trxs_handlers::handler(req).await,
         _ => {
             // Return 404 not found response.
