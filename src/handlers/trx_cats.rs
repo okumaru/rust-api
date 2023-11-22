@@ -1,6 +1,7 @@
 
 use crate::handlers::req_query_id;
-use crate::models::trx_cats::{ TrxCatModel, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat, build_model_from_exist };
+use crate::models::trx_cats;
+use crate::models::trx_cats::{ TrxCatModel, TrxCatModelWithType, ExistTrxCatWithBudgetType, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat };
 use crate::repositories::trx_cats::{TrxCatRepo, TrxCatTrait};
 
 use std::env;
@@ -28,8 +29,8 @@ impl<'a> TrxCatHandler<'a> {
 
     async fn list(&mut self) -> Result<Response<Body>> {
 
-        let datas: Vec<ExistTrxCatWithBudget> = self.trx_cat_repo.trx_cats_list().await?;
-        let cats: Vec<TrxCatModel> = datas.iter().map(|data| build_model_from_exist(data.clone())).collect();
+        let datas: Vec<ExistTrxCatWithBudgetType> = self.trx_cat_repo.trx_cats_list().await?;
+        let cats: Vec<TrxCatModelWithType> = datas.iter().map(|data| trx_cats::detail_model_from_exist(data.clone())).collect();
 
         let res = match serde_json::to_string(&cats) {
             Ok(json) => Response::builder()
@@ -47,8 +48,8 @@ impl<'a> TrxCatHandler<'a> {
     async fn detail(&mut self) -> Result<Response<Body>> { 
 
         let query_id = req_query_id(self.request);
-        let data: ExistTrxCatWithBudget = self.trx_cat_repo.trx_cats_detail(query_id).await?;
-        let cat: TrxCatModel = build_model_from_exist(data);
+        let data: ExistTrxCatWithBudgetType = self.trx_cat_repo.trx_cats_detail(query_id).await?;
+        let cat: TrxCatModelWithType = trx_cats::detail_model_from_exist(data);
 
         let res = match serde_json::to_string(&cat) {
             Ok(json) => Response::builder()
@@ -67,7 +68,7 @@ impl<'a> TrxCatHandler<'a> {
 
         let data: AddTrxCat = serde_json::from_str(body)?;
         let new_cat: ExistTrxCatWithBudget = self.trx_cat_repo.trx_cats_add(data.clone()).await?;
-        let cat: TrxCatModel = build_model_from_exist(new_cat);
+        let cat: TrxCatModel = trx_cats::build_model_from_exist(new_cat);
 
         let res = match serde_json::to_string(&cat) {
             Ok(json) => Response::builder()
@@ -87,7 +88,7 @@ impl<'a> TrxCatHandler<'a> {
         let query_id = req_query_id(self.request);
         let data: UpdateTrxCat = serde_json::from_str(body)?;
         let update_cat = self.trx_cat_repo.trx_cats_update(query_id, data.clone()).await?;
-        let cat: TrxCatModel = build_model_from_exist(update_cat);
+        let cat: TrxCatModel = trx_cats::build_model_from_exist(update_cat);
 
         let res = match serde_json::to_string(&cat) {
             Ok(json) => Response::builder()
@@ -106,7 +107,7 @@ impl<'a> TrxCatHandler<'a> {
 
         let query_id = req_query_id(self.request);
         let delete_cat = self.trx_cat_repo.trx_cats_delete(query_id).await?;
-        let cat: TrxCatModel = build_model_from_exist(delete_cat);
+        let cat: TrxCatModel = trx_cats::build_model_from_exist(delete_cat);
 
         let res = match serde_json::to_string(&cat) {
             Ok(json) => Response::builder()

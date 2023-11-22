@@ -1,5 +1,5 @@
 
-use crate::models::cat_types::{ ExistCatTypeWithBudget, AddCatType, UpdateCatType };
+use crate::models::cat_types::{ ExistCatType, ExistCatTypeWithBudget, AddCatType, UpdateCatType };
 use crate::repositories::{ Executor, UpdateQuery };
 
 use futures_util::{future::BoxFuture, FutureExt};
@@ -183,6 +183,25 @@ fn query_detail_cat_type<'a>(
         let cat_type = query
             .push_bind(id)
             .build_query_as::<ExistCatTypeWithBudget>()
+            .fetch_one(db.as_executor())
+            .await
+            .unwrap();
+
+        cat_type
+    }
+    .boxed()
+}
+
+pub fn query_detail_type<'a>(
+    db: &'a mut impl Executor,
+    id: i32
+) -> BoxFuture<'a, ExistCatType> {
+    async move {
+        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblcategorytypes WHERE id = "#);
+
+        let cat_type = query
+            .push_bind(id)
+            .build_query_as::<ExistCatType>()
             .fetch_one(db.as_executor())
             .await
             .unwrap();

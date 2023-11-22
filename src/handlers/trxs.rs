@@ -1,7 +1,7 @@
 
 use crate::handlers::req_query_id;
 use crate::models::bigdecimal_to_int;
-use crate::models::trxs::{ TrxModel, NewTrx, UpdateTrx };
+use crate::models::trxs::{ TrxModel, TrxModelWithAccCat, NewTrx, UpdateTrx, build_model_from_exist };
 use crate::repositories::trxs::{TrxRepo, TrxTrait};
 
 use std::env;
@@ -30,18 +30,7 @@ impl<'a> TrxHandler<'a> {
     async fn list(&mut self) -> Result<Response<Body>> {
 
         let datas = self.trx_repo.trxs_list().await?;
-        let trxs: Vec<TrxModel> = datas.iter().map(|trx| TrxModel {
-            id: trx.id,
-            credit: bigdecimal_to_int(trx.credit.clone()),
-            debit: bigdecimal_to_int(trx.debit.clone()),
-            description: trx.description.clone(),
-            balance_before: bigdecimal_to_int(trx.balance_before.clone()),
-            balance_after: bigdecimal_to_int(trx.balance_after.clone()),
-            created_at: trx.created_at,
-            updated_at: trx.updated_at,
-            accountid: trx.accountid,
-            categoryid: trx.categoryid,
-        }).collect();
+        let trxs: Vec<TrxModelWithAccCat> = datas.iter().map(|data| build_model_from_exist(data.clone())).collect();
 
         let res = match serde_json::to_string(&trxs) {
             Ok(json) => Response::builder()
@@ -60,19 +49,7 @@ impl<'a> TrxHandler<'a> {
 
         let query_id = req_query_id(self.request);
         let data = self.trx_repo.trx_detail(query_id).await?;
-
-        let trx = TrxModel {
-            id: data.id,
-            credit: bigdecimal_to_int(data.credit),
-            debit: bigdecimal_to_int(data.debit),
-            description: data.description,
-            balance_before: bigdecimal_to_int(data.balance_before),
-            balance_after: bigdecimal_to_int(data.balance_after),
-            created_at: data.created_at,
-            updated_at: data.updated_at,
-            accountid: data.accountid,
-            categoryid: data.categoryid,
-        };
+        let trx = build_model_from_exist(data);
 
         let res = match serde_json::to_string(&trx) {
             Ok(json) => Response::builder()

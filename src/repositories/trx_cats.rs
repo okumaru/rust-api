@@ -1,8 +1,9 @@
 
 use crate::models::trx_cats;
-use crate::models::trx_cats::{ ExistTrxCat, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat };
+use crate::models::trx_cats::{ ExistTrxCat, ExistTrxCatWithBudgetType, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat };
 use crate::models::trx_cat_budgets::{ ExistTrxCatBudget, NewTrxCatBudget };
 use crate::repositories::{ Executor, UpdateQuery };
+use crate::repositories::cat_types;
 use crate::repositories::trx_cat_budgets;
 
 use futures_util::{future::BoxFuture, FutureExt};
@@ -28,11 +29,11 @@ pub trait TransactionTrait: Send + Sync + TrxCatTrait {
 pub trait TrxCatTrait {
     async fn trx_cats_list(
         &mut self,
-    ) -> Result<Vec<ExistTrxCatWithBudget>, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<Vec<ExistTrxCatWithBudgetType>, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cats_detail(
         &mut self,
         id: i32,
-    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistTrxCatWithBudgetType, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cats_add(
         &mut self,
         account: AddTrxCat,
@@ -89,19 +90,22 @@ impl TransactionTrait for TrxCatRepo<sqlx::Transaction<'static, MySql>> {
 impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
     async fn trx_cats_list(
         &mut self,
-    ) -> Result<Vec<ExistTrxCatWithBudget>, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<Vec<ExistTrxCatWithBudgetType>, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
-        let mut data_cats: Vec<ExistTrxCatWithBudget> = Vec::new();
+        let mut data_cats: Vec<ExistTrxCatWithBudgetType> = Vec::new();
 
         let trx_cats: Vec<ExistTrxCat> = query_list_trx_cats(&mut self.db).await;
         for cat in trx_cats.iter() {
             
             let id = cat.id;
+            let typeid = cat.typeid;
+
+            let data_type = cat_types::query_detail_type(&mut self.db, typeid).await;
 
             // detail trx cat budget
             let data_budget: Option<ExistTrxCatBudget> = trx_cat_budgets::query_latest_trx_cat_budget_by_catid(&mut self.db, id).await;
             
-            let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(cat.clone(), data_budget);
+            let trx_cat: ExistTrxCatWithBudgetType = trx_cats::build_exist_trx_cat_budget_type(cat.clone(), data_type, data_budget);
             data_cats.push(trx_cat);
 
         }
@@ -112,15 +116,18 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
     async fn trx_cats_detail(
         &mut self,
         id: i32,
-    ) -> Result<ExistTrxCatWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<ExistTrxCatWithBudgetType, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
         // detail trx cat
         let data_cat: ExistTrxCat = query_detail_trx_cats(&mut self.db, id).await;
 
+        let typeid = data_cat.typeid;
+        let data_type = cat_types::query_detail_type(&mut self.db, typeid).await;
+
         // detail trx cat budget
         let data_budget: Option<ExistTrxCatBudget> = trx_cat_budgets::query_latest_trx_cat_budget_by_catid(&mut self.db, id).await;
         
-        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, data_budget);
+        let trx_cat: ExistTrxCatWithBudgetType = trx_cats::build_exist_trx_cat_budget_type(data_cat, data_type, data_budget);
         Ok(trx_cat)
     }
 
@@ -214,7 +221,7 @@ fn query_list_trx_cats<'a>(
     .boxed()
 }
 
-fn query_detail_trx_cats<'a>(
+pub fn query_detail_trx_cats<'a>(
     db: &'a mut impl Executor,
     id: i32
 ) -> BoxFuture<'a, ExistTrxCat> {

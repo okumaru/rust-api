@@ -1415,7 +1415,7 @@ dependencies = [
 
 [[package]]
 name = "sohfin_api"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "async-trait",
  "bigdecimal 0.4.2",
