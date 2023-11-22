@@ -1,8 +1,9 @@
 
-use crate::models::trx_cats::{ ExistTrxCat, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat, build_exist_trx_cat_budget };
+use crate::models::trx_cats;
+use crate::models::trx_cats::{ ExistTrxCat, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat };
 use crate::models::trx_cat_budgets::{ ExistTrxCatBudget, AddTrxCatBudget, NewTrxCatBudget, UpdateTrxCatBudget };
 use crate::repositories::{ Executor, UpdateQuery };
-use crate::repositories::trx_cat_budgets::{query_latest_trx_cat_budget_by_catid, query_add_trx_cat_budget, query_update_trx_cat_budget, query_delete_cat_budget_by_catid};
+use crate::repositories::trx_cat_budgets;
 
 use futures_util::{future::BoxFuture, FutureExt};
 use sqlx::{MySql, MySqlPool};
@@ -98,9 +99,9 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
             let id = cat.id;
 
             // detail trx cat budget
-            let data_budget: Option<ExistTrxCatBudget> = query_latest_trx_cat_budget_by_catid(&mut self.db, id).await;
+            let data_budget: Option<ExistTrxCatBudget> = trx_cat_budgets::query_latest_trx_cat_budget_by_catid(&mut self.db, id).await;
             
-            let trx_cat: ExistTrxCatWithBudget = build_exist_trx_cat_budget(cat.clone(), data_budget);
+            let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(cat.clone(), data_budget);
             data_cats.push(trx_cat);
 
         }
@@ -117,9 +118,9 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
         let data_cat: ExistTrxCat = query_detail_trx_cats(&mut self.db, id).await;
 
         // detail trx cat budget
-        let data_budget: Option<ExistTrxCatBudget> = query_latest_trx_cat_budget_by_catid(&mut self.db, id).await;
+        let data_budget: Option<ExistTrxCatBudget> = trx_cat_budgets::query_latest_trx_cat_budget_by_catid(&mut self.db, id).await;
         
-        let trx_cat: ExistTrxCatWithBudget = build_exist_trx_cat_budget(data_cat, data_budget);
+        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, data_budget);
         Ok(trx_cat)
     }
 
@@ -145,17 +146,17 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
                 categoryid: trx_cat_id,
             };
 
-            let _ = query_add_trx_cat_budget(&mut self.db, add_budget).await;
+            let _ = trx_cat_budgets::query_add_trx_cat_budget(&mut self.db, add_budget).await;
             
             // detail trx cat budget
-            data_budget = query_latest_trx_cat_budget_by_catid(&mut self.db, trx_cat_id).await;
+            data_budget = trx_cat_budgets::query_latest_trx_cat_budget_by_catid(&mut self.db, trx_cat_id).await;
 
         }
 
         // detail trx cat
         let data_cat: ExistTrxCat = query_detail_trx_cats(&mut self.db, trx_cat_id).await;
 
-        let trx_cat: ExistTrxCatWithBudget = build_exist_trx_cat_budget(data_cat, data_budget);
+        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, data_budget);
         Ok(trx_cat)
     }
 
@@ -171,7 +172,7 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
         // trx cat detail
         let data_cat = query_detail_trx_cats(&mut self.db, id).await;
 
-        let trx_cat: ExistTrxCatWithBudget = build_exist_trx_cat_budget(data_cat, None);
+        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, None);
 
         Ok(trx_cat)
     }
@@ -185,12 +186,12 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
         let data_cat = query_detail_trx_cats(&mut self.db, id).await;
 
         // delete trx cat budget
-        let _ = query_delete_cat_budget_by_catid(&mut self.db, id).await;
+        let _ = trx_cat_budgets::query_delete_cat_budget_by_catid(&mut self.db, id).await;
 
         // delete trx cat
         let _ = query_delete_trx_cats(&mut self.db, id).await;
 
-        let trx_cat: ExistTrxCatWithBudget = build_exist_trx_cat_budget(data_cat, None);
+        let trx_cat: ExistTrxCatWithBudget = trx_cats::build_exist_trx_cat_budget(data_cat, None);
 
         Ok(trx_cat)
     }
@@ -295,7 +296,9 @@ fn query_update_trx_cats<'a>(
                 .push_bind_unseparated(update.value.clone());
         }
 
-        separated.push_unseparated(" WHERE id = ")
+        separated
+            .push("updated_at = current_timestamp()")
+            .push_unseparated(" WHERE id = ")
             .push_bind_unseparated(id);
         
         let res = query

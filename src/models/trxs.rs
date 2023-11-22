@@ -58,5 +58,4 @@ pub struct UpdateTrx {
     pub credit: Option<i64>,
     pub debit: Option<i64>,
     pub description: Option<String>,
-    pub categoryid: Option<i32>,
 }

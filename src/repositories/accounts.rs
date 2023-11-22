@@ -4,6 +4,7 @@ use crate::repositories::{ Executor, UpdateQuery };
 
 use futures_util::{future::BoxFuture, FutureExt};
 use sqlx::{MySql, MySqlPool};
+use sqlx_mysql::MySqlQueryResult;
 
 #[async_trait::async_trait]
 pub trait Trait: Send + Sync + AccountTrait {
@@ -207,6 +208,29 @@ pub fn query_add_account<'a>(
     .boxed()
 }
 
+pub fn update_acc_balance<'a>(
+    db: &'a mut impl Executor,
+    id: i32,
+    amount: i64,
+) -> BoxFuture<'a, MySqlQueryResult> {
+    async move {
+
+        let mut query = sqlx::QueryBuilder::new(r#"UPDATE tblaccounts SET "#);
+        query.push(" balance = balance + ").push_bind(amount)
+            .push(" , updated_at = current_timestamp() ")
+            .push(" WHERE id = ").push_bind(id);
+
+        let res = query
+            .build()
+            .execute(db.as_executor())
+            .await
+            .unwrap();
+
+        res
+    }
+    .boxed()
+}
+
 pub fn query_update_account<'a>(
     db: &'a mut impl Executor,
     id: i32,
@@ -259,7 +283,9 @@ pub fn query_update_account<'a>(
                 .push_bind_unseparated(update.value.clone());
         }
 
-        separated.push_unseparated(" WHERE id = ")
+        separated
+            .push("updated_at = current_timestamp()")
+            .push_unseparated(" WHERE id = ")
             .push_bind_unseparated(id);
         
         query.build()

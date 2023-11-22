@@ -5,7 +5,7 @@ pub mod accounts;
 pub mod cat_types;
 pub mod trx_cats;
 pub mod trx_cat_budgets;
-// pub mod trxs;
+pub mod trxs;
 
 pub fn bigdecimal_to_int(value: BigDecimal) -> i64 {
     let (big_int, _) = value.into_bigint_and_exponent();

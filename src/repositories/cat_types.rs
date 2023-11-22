@@ -1,5 +1,5 @@
 
-use crate::models::cat_types::{ ExistCatType, AddCatType, UpdateCatType };
+use crate::models::cat_types::{ ExistCatType, ExistCatTypeWithBudget, AddCatType, UpdateCatType };
 use crate::repositories::{ Executor, UpdateQuery };
 
 use futures_util::{future::BoxFuture, FutureExt};
@@ -26,28 +26,28 @@ pub trait CatTypeTrait {
 
     async fn cat_types_list(
         &mut self,
-    ) -> Result<Vec<ExistCatType>, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<Vec<ExistCatTypeWithBudget>, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
     async fn cat_type_detail(
         &mut self,
         id: i32,
-    ) -> Result<ExistCatType, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistCatTypeWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
     async fn cat_type_add(
         &mut self,
         cat_type: AddCatType,
-    ) -> Result<ExistCatType, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistCatTypeWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
     async fn cat_type_update(
         &mut self,
         id: i32,
         cat_type: UpdateCatType,
-    ) -> Result<ExistCatType, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistCatTypeWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
     async fn cat_type_delete(
         &mut self,
         id: i32,
-    ) -> Result<ExistCatType, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistCatTypeWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>>;
 }
 
 #[derive(Debug, Clone)]
@@ -92,7 +92,7 @@ impl<E: 'static + Executor> CatTypeTrait for CatTypeRepo<E> {
 
     async fn cat_types_list(
         &mut self,
-    ) -> Result<Vec<ExistCatType>, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<Vec<ExistCatTypeWithBudget>, Box<dyn std::error::Error + Send + Sync + 'static>> {
         let cat_types = query_list_cat_types(&mut self.db).await;
         Ok(cat_types)
     }
@@ -100,7 +100,7 @@ impl<E: 'static + Executor> CatTypeTrait for CatTypeRepo<E> {
     async fn cat_type_detail(
         &mut self,
         id: i32,
-    ) -> Result<ExistCatType, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<ExistCatTypeWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
         // detail cat type
         let cat_types = query_detail_cat_type(&mut self.db, id).await;
         Ok(cat_types)
@@ -109,7 +109,7 @@ impl<E: 'static + Executor> CatTypeTrait for CatTypeRepo<E> {
     async fn cat_type_add(
         &mut self,
         cat_type: AddCatType,
-    ) -> Result<ExistCatType, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<ExistCatTypeWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
         // add cat type
         let add = query_add_cat_type(&mut self.db, cat_type).await;
         let cat_type_id = i32::try_from(add.last_insert_id()).unwrap();
@@ -123,7 +123,7 @@ impl<E: 'static + Executor> CatTypeTrait for CatTypeRepo<E> {
         &mut self,
         id: i32,
         cat_type: UpdateCatType,
-    ) -> Result<ExistCatType, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<ExistCatTypeWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
         // update cat type
         let _ = query_update_cat_type(&mut self.db, id, cat_type).await;
 
@@ -135,7 +135,7 @@ impl<E: 'static + Executor> CatTypeTrait for CatTypeRepo<E> {
     async fn cat_type_delete(
         &mut self,
         id: i32,
-    ) -> Result<ExistCatType, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<ExistCatTypeWithBudget, Box<dyn std::error::Error + Send + Sync + 'static>> {
         // cat type detail
         let cat_type = query_detail_cat_type(&mut self.db, id).await;
         // delete cat type
@@ -146,12 +146,20 @@ impl<E: 'static + Executor> CatTypeTrait for CatTypeRepo<E> {
 
 fn query_list_cat_types<'a>(
     db: &'a mut impl Executor,
-) -> BoxFuture<'a, Vec<ExistCatType>> {
+) -> BoxFuture<'a, Vec<ExistCatTypeWithBudget>> {
     async move {
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblcategorytypes"#);
+        let mut query = sqlx::QueryBuilder::new(r#"SELECT 
+            t.*, SUM(t3.allocated) as allocated, SUM(t3.spent) as spent, SUM(t3.available) as available
+            FROM tblcategorytypes t 
+            LEFT JOIN tbltransactioncategories t2 ON t2.typeid = t.id 
+            LEFT JOIN tblcategorybudgets t3 ON t3.categoryid = t2.id AND t3.id = (
+                SELECT MAX(budget.id) from tblcategorybudgets budget WHERE budget.categoryid = t2.id
+            )
+            GROUP by t.id 
+            ORDER by t.id ASC"#);
 
         let cat_types = query
-            .build_query_as::<ExistCatType>()
+            .build_query_as::<ExistCatTypeWithBudget>()
             .fetch_all(db.as_executor())
             .await
             .unwrap();
@@ -164,13 +172,17 @@ fn query_list_cat_types<'a>(
 fn query_detail_cat_type<'a>(
     db: &'a mut impl Executor,
     id: i32
-) -> BoxFuture<'a, ExistCatType> {
+) -> BoxFuture<'a, ExistCatTypeWithBudget> {
     async move {
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblcategorytypes WHERE id = "#);
+        let mut query = sqlx::QueryBuilder::new(r#"SELECT t.*, SUM(t3.allocated) as allocated, SUM(t3.spent) as spent, SUM(t3.available) as available
+            FROM tblcategorytypes t 
+            LEFT JOIN tbltransactioncategories t2 ON t2.typeid = t.id 
+            LEFT JOIN tblcategorybudgets t3 ON t3.categoryid = t2.id AND t3.id = (SELECT MAX(budget.id) from tblcategorybudgets budget WHERE budget.categoryid = t2.id)
+            WHERE t.id = "#);
 
         let cat_type = query
             .push_bind(id)
-            .build_query_as::<ExistCatType>()
+            .build_query_as::<ExistCatTypeWithBudget>()
             .fetch_one(db.as_executor())
             .await
             .unwrap();
@@ -254,7 +266,9 @@ fn query_update_cat_type<'a>(
                 .push_bind_unseparated(update.value.clone());
         }
 
-        separated.push_unseparated(" WHERE id = ")
+        separated
+            .push("updated_at = current_timestamp()")
+            .push_unseparated(" WHERE id = ")
             .push_bind_unseparated(id);
         
         let res = query.build()

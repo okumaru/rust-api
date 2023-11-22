@@ -238,6 +238,31 @@ pub fn query_add_trx_cat_budget<'a>(
     .boxed()
 }
 
+pub fn query_update_trx_cat_badget<'a>(
+    db: &'a mut impl Executor,
+    catid: i32,
+    amount: i64,
+) -> BoxFuture<'a, MySqlQueryResult> {
+    async move {
+
+        let mut query = sqlx::QueryBuilder::new(r#"UPDATE tblcategorybudgets SET "#);
+        query.push(" spent = spent +  ").push_bind(amount)
+            .push(" , available = available - ").push_bind(amount)
+            .push(" , updated_at = current_timestamp() ")
+            .push(" WHERE categoryid = ").push_bind(catid)
+            .push(" ORDER By id DESC LIMIT 1 ");
+
+        let res = query
+            .build()
+            .execute(db.as_executor())
+            .await
+            .unwrap();
+
+        res
+    }
+    .boxed()
+}
+
 pub fn query_update_trx_cat_budget<'a>(
     db: &'a mut impl Executor,
     id: i32,
@@ -283,7 +308,9 @@ pub fn query_update_trx_cat_budget<'a>(
                 .push_bind_unseparated(update.value.clone());
         }
 
-        separated.push_unseparated(" WHERE id = ")
+        separated
+            .push("updated_at = current_timestamp()")
+            .push_unseparated(" WHERE id = ")
             .push_bind_unseparated(id);
         
         let res = query.build()

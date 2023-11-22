@@ -3,7 +3,7 @@ pub mod accounts;
 pub mod cat_types;
 pub mod trx_cats;
 pub mod trx_cat_budgets;
-// pub mod trxs;
+pub mod trxs;
 
 pub struct UpdateQuery {
     key: String,
