@@ -1,7 +1,7 @@
 
 use crate::models::trx_cats;
 use crate::models::trx_cats::{ ExistTrxCat, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat };
-use crate::models::trx_cat_budgets::{ ExistTrxCatBudget, AddTrxCatBudget, NewTrxCatBudget, UpdateTrxCatBudget };
+use crate::models::trx_cat_budgets::{ ExistTrxCatBudget, NewTrxCatBudget };
 use crate::repositories::{ Executor, UpdateQuery };
 use crate::repositories::trx_cat_budgets;
 

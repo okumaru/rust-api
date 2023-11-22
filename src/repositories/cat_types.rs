@@ -1,5 +1,5 @@
 
-use crate::models::cat_types::{ ExistCatType, ExistCatTypeWithBudget, AddCatType, UpdateCatType };
+use crate::models::cat_types::{ ExistCatTypeWithBudget, AddCatType, UpdateCatType };
 use crate::repositories::{ Executor, UpdateQuery };
 
 use futures_util::{future::BoxFuture, FutureExt};

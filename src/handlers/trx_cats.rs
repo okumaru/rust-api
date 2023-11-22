@@ -1,8 +1,6 @@
 
 use crate::handlers::req_query_id;
-use crate::models::bigdecimal_to_int;
 use crate::models::trx_cats::{ TrxCatModel, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat, build_model_from_exist };
-use crate::models::trx_cat_budgets::{TrxCatBudgetModel};
 use crate::repositories::trx_cats::{TrxCatRepo, TrxCatTrait};
 
 use std::env;

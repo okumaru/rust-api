@@ -1,6 +1,5 @@
 
-use crate::models::trx_cats::{ ExistTrxCat, ExistTrxCatWithBudget, build_exist_trx_cat_budget };
-use crate::models::trx_cat_budgets::{ ExistTrxCatBudget, AddTrxCatBudget, NewTrxCatBudget, UpdateTrxCatBudget };
+use crate::models::trx_cat_budgets::{ ExistTrxCatBudget, NewTrxCatBudget, UpdateTrxCatBudget };
 use crate::repositories::{ Executor, UpdateQuery };
 
 use futures_util::{future::BoxFuture, FutureExt};
@@ -24,9 +23,6 @@ pub trait TransactionTrait: Send + Sync + TrxCatBudgetTrait {
 
 #[async_trait::async_trait]
 pub trait TrxCatBudgetTrait {
-    async fn trx_cat_budget_list(
-        &mut self,
-    ) -> Result<Vec<ExistTrxCatBudget>, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cat_budget_detail(
         &mut self,
         id: i32,
@@ -85,14 +81,6 @@ impl TransactionTrait for TrxCatBudgetRepo<sqlx::Transaction<'static, MySql>> {
 
 #[async_trait::async_trait]
 impl<E: 'static + Executor> TrxCatBudgetTrait for TrxCatBudgetRepo<E> {
-    async fn trx_cat_budget_list(
-        &mut self,
-    ) -> Result<Vec<ExistTrxCatBudget>, Box<dyn std::error::Error + Send + Sync + 'static>> {
-
-        let budget = query_list_trx_cat_budget(&mut self.db).await;
-        Ok(budget)
-    }
-
     async fn trx_cat_budget_detail(
         &mut self,
         id: i32,
@@ -143,23 +131,6 @@ impl<E: 'static + Executor> TrxCatBudgetTrait for TrxCatBudgetRepo<E> {
 
         Ok(budget)
     }
-}
-
-pub fn query_list_trx_cat_budget<'a>(
-    db: &'a mut impl Executor,
-) -> BoxFuture<'a, Vec<ExistTrxCatBudget>> {
-    async move {
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblcategorybudgets"#);
-
-        let trxs = query
-            .build_query_as::<ExistTrxCatBudget>()
-            .fetch_all(db.as_executor())
-            .await
-            .unwrap();
-
-        trxs
-    }
-    .boxed()
 }
 
 pub fn query_detail_trx_cat_budget<'a>(
