@@ -3,7 +3,7 @@ use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::types::BigDecimal;
 use sqlx::FromRow;
 
-#[derive(Debug, FromRow, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, FromRow, Deserialize, Serialize)]
 pub struct CatTypeModel {
     pub id: i32,
     pub r#type: String,
@@ -15,7 +15,7 @@ pub struct CatTypeModel {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, FromRow, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, FromRow, Deserialize, Serialize)]
 pub struct CatTypeModelWithBudget {
     pub id: i32,
     pub r#type: String,

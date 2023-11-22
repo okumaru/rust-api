@@ -1,8 +1,9 @@
 
 use crate::models::bigdecimal_to_int;
-use crate::models::trxs::{ ExistTrx, NewTrx, AddTrx, UpdateTrx };
+use crate::models::trxs::{ ExistTrx, ExistTrxWithAccCat, NewTrx, AddTrx, UpdateTrx };
 use crate::repositories::{ Executor, UpdateQuery };
 use crate::repositories::accounts;
+use crate::repositories::trx_cats;
 use crate::repositories::trx_cat_budgets;
 
 use futures_util::{future::BoxFuture, FutureExt};
@@ -28,11 +29,11 @@ pub trait TransactionTrait: Send + Sync + TrxTrait {
 pub trait TrxTrait {
     async fn trxs_list(
         &mut self,
-    ) -> Result<Vec<ExistTrx>, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<Vec<ExistTrxWithAccCat>, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_detail(
         &mut self,
         id: i32,
-    ) -> Result<ExistTrx, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<ExistTrxWithAccCat, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_add(
         &mut self,
         account: NewTrx,
@@ -89,8 +90,36 @@ impl TransactionTrait for TrxRepo<sqlx::Transaction<'static, MySql>> {
 impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
     async fn trxs_list(
         &mut self,
-    ) -> Result<Vec<ExistTrx>, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let trxs = query_list_trx(&mut self.db).await;
+    ) -> Result<Vec<ExistTrxWithAccCat>, Box<dyn std::error::Error + Send + Sync + 'static>> {
+
+        let mut trxs: Vec<ExistTrxWithAccCat> = Vec::new();
+
+        let data_trxs = query_list_trx(&mut self.db).await;
+        for data in data_trxs.iter() {
+
+            let acc_id = data.accountid;
+            let cat_id = data.categoryid;
+
+            let account = accounts::query_detail_account(&mut self.db, acc_id).await;
+            let category = trx_cats::query_detail_trx_cats(&mut self.db, cat_id).await;
+
+            let trx: ExistTrxWithAccCat = ExistTrxWithAccCat {
+                id: data.id,
+                credit: data.credit.clone(),
+                debit: data.debit.clone(),
+                description: data.description.clone(),
+                balance_before: data.balance_before.clone(),
+                balance_after: data.balance_after.clone(),
+                created_at: data.created_at,
+                updated_at: data.updated_at,
+                accountid: data.accountid,
+                categoryid: data.categoryid,
+                account: account,
+                category: category
+            };
+
+            trxs.push(trx);
+        }
 
         Ok(trxs)
     }
@@ -98,8 +127,30 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
     async fn trx_detail(
         &mut self,
         id: i32,
-    ) -> Result<ExistTrx, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let trx = query_detail_trx(&mut self.db, id).await;
+    ) -> Result<ExistTrxWithAccCat, Box<dyn std::error::Error + Send + Sync + 'static>> {
+
+        let data_trx = query_detail_trx(&mut self.db, id).await;
+
+        let acc_id = data_trx.accountid;
+        let cat_id = data_trx.categoryid;
+
+        let account = accounts::query_detail_account(&mut self.db, acc_id).await;
+        let category = trx_cats::query_detail_trx_cats(&mut self.db, cat_id).await;
+
+        let trx: ExistTrxWithAccCat = ExistTrxWithAccCat {
+            id: data_trx.id,
+            credit: data_trx.credit,
+            debit: data_trx.debit,
+            description: data_trx.description,
+            balance_before: data_trx.balance_before,
+            balance_after: data_trx.balance_after,
+            created_at: data_trx.created_at,
+            updated_at: data_trx.updated_at,
+            accountid: data_trx.accountid,
+            categoryid: data_trx.categoryid,
+            account: account,
+            category: category
+        };
 
         Ok(trx)
     }
