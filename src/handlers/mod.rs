@@ -48,6 +48,33 @@ pub async fn handler(
     }
 }
 
+pub fn get_req_query( 
+    req: &Request<Body>, 
+    filter: String 
+) -> Option<String> {
+
+    let queries = req.uri().query();
+    if queries.is_none() {
+        return None;
+    }
+
+    // get data with filter query
+    let params: HashMap<String, String> = req
+        .uri()
+        .query()
+        .map(|v| {
+            url::form_urlencoded::parse(v.as_bytes())
+                .into_owned()
+                .collect()
+        })
+        .unwrap_or_else(HashMap::new);
+
+    return match params.get(&filter) {
+        Some(_) => Some(params.get(&filter).unwrap().to_string()),
+        None => None
+    }
+}
+
 pub fn req_query_id( req: &Request<Body> ) -> i32 {
 
     let queries = req.uri().query();

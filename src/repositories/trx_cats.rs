@@ -29,6 +29,7 @@ pub trait TransactionTrait: Send + Sync + TrxCatTrait {
 pub trait TrxCatTrait {
     async fn trx_cats_list(
         &mut self,
+        typeid: i32,
     ) -> Result<Vec<ExistTrxCatWithBudgetType>, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cats_detail(
         &mut self,
@@ -90,11 +91,12 @@ impl TransactionTrait for TrxCatRepo<sqlx::Transaction<'static, MySql>> {
 impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
     async fn trx_cats_list(
         &mut self,
+        filter_type_id: i32,
     ) -> Result<Vec<ExistTrxCatWithBudgetType>, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
         let mut data_cats: Vec<ExistTrxCatWithBudgetType> = Vec::new();
 
-        let trx_cats: Vec<ExistTrxCat> = query_list_trx_cats(&mut self.db).await;
+        let trx_cats: Vec<ExistTrxCat> = query_list_trx_cats(&mut self.db, filter_type_id).await;
         for cat in trx_cats.iter() {
             
             let id = cat.id;
@@ -206,9 +208,16 @@ impl<E: 'static + Executor> TrxCatTrait for TrxCatRepo<E> {
 
 fn query_list_trx_cats<'a>(
     db: &'a mut impl Executor,
+    typeid: i32
 ) -> BoxFuture<'a, Vec<ExistTrxCat>> {
     async move {
         let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tbltransactioncategories"#);
+
+        if typeid != 0 {
+            query
+                .push(" WHERE typeid = ")
+                .push_bind(typeid);
+        }
 
         let trx_cats = query
             .build_query_as::<ExistTrxCat>()

@@ -14,7 +14,9 @@ pub struct TrxModel {
     pub credit: i64,
     pub debit: i64,
     pub description: Option<String>,
+    #[serde(rename = "balanceBefore")]
     pub balance_before: i64,
+    #[serde(rename = "balanceAfter")]
     pub balance_after: i64,
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
@@ -30,7 +32,9 @@ pub struct TrxModelWithAccCat {
     pub credit: i64,
     pub debit: i64,
     pub description: Option<String>,
+    #[serde(rename = "balanceBefore")]
     pub balance_before: i64,
+    #[serde(rename = "balanceAfter")]
     pub balance_after: i64,
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
