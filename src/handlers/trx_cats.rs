@@ -1,5 +1,5 @@
 
-use crate::handlers::req_query_id;
+use crate::handlers::{req_query_id, get_req_query};
 use crate::models::trx_cats;
 use crate::models::trx_cats::{ TrxCatModel, TrxCatModelWithType, ExistTrxCatWithBudgetType, ExistTrxCatWithBudget, AddTrxCat, UpdateTrxCat };
 use crate::repositories::trx_cats::{TrxCatRepo, TrxCatTrait};
@@ -29,7 +29,9 @@ impl<'a> TrxCatHandler<'a> {
 
     async fn list(&mut self) -> Result<Response<Body>> {
 
-        let datas: Vec<ExistTrxCatWithBudgetType> = self.trx_cat_repo.trx_cats_list().await?;
+        let str_type_id: Option<String> = get_req_query(self.request, "typeid".to_string());
+        let type_id: i32 = str_type_id.unwrap_or("0".to_string()).parse().ok().unwrap_or_default();
+        let datas: Vec<ExistTrxCatWithBudgetType> = self.trx_cat_repo.trx_cats_list(type_id).await?;
         let cats: Vec<TrxCatModelWithType> = datas.iter().map(|data| trx_cats::detail_model_from_exist(data.clone())).collect();
 
         let res = match serde_json::to_string(&cats) {
@@ -132,14 +134,18 @@ pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
     
     let request: hyper::Request<Body> = Request::from_parts(parts, body_bytes.clone().into());
     let mut trx_cat_handler = TrxCatHandler::new(&request, pool);
+    let is_specified: bool = match get_req_query(&request, "id".to_string()) {
+        Some(_) => true,
+        None => false
+    };
 
-    match (request.method(), request.uri().query().is_none()) {
+    match (request.method(), is_specified) {
 
-        (&Method::GET, true) => trx_cat_handler.list().await,
-        (&Method::GET, false) => trx_cat_handler.detail().await,
-        (&Method::PUT, true) => trx_cat_handler.add(body).await,
-        (&Method::POST, false) => trx_cat_handler.update(body).await,
-        (&Method::DELETE, false) => trx_cat_handler.delete().await,
+        (&Method::GET, false) => trx_cat_handler.list().await,
+        (&Method::GET, true) => trx_cat_handler.detail().await,
+        (&Method::PUT, false) => trx_cat_handler.add(body).await,
+        (&Method::POST, true) => trx_cat_handler.update(body).await,
+        (&Method::DELETE, true) => trx_cat_handler.delete().await,
 
         // 
         _ => {
