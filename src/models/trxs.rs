@@ -18,6 +18,7 @@ pub struct TrxModel {
     pub balance_before: i64,
     #[serde(rename = "balanceAfter")]
     pub balance_after: i64,
+    pub datetime: DateTime<Utc>,
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
     #[serde(rename = "updatedAt")]
@@ -36,6 +37,7 @@ pub struct TrxModelWithAccCat {
     pub balance_before: i64,
     #[serde(rename = "balanceAfter")]
     pub balance_after: i64,
+    pub datetime: DateTime<Utc>,
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
     #[serde(rename = "updatedAt")]
@@ -54,6 +56,7 @@ pub struct ExistTrx {
     pub description: Option<String>,
     pub balance_before: BigDecimal,
     pub balance_after: BigDecimal,
+    pub datetime: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub accountid: i32,
@@ -68,6 +71,7 @@ pub struct ExistTrxWithAccCat {
     pub description: Option<String>,
     pub balance_before: BigDecimal,
     pub balance_after: BigDecimal,
+    pub datetime: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub accountid: i32,
@@ -81,6 +85,7 @@ pub struct NewTrx {
     pub credit: i64,
     pub debit: i64,
     pub description: Option<String>,
+    pub datetime: String,
     pub accountid: i32,
     pub categoryid: i32,
 }
@@ -92,6 +97,7 @@ pub struct AddTrx {
     pub description: Option<String>,
     pub balance_before: i64,
     pub balance_after: i64,
+    pub datetime: String,
     pub accountid: i32,
     pub categoryid: i32,
 }
@@ -101,6 +107,7 @@ pub struct UpdateTrx {
     pub credit: Option<i64>,
     pub debit: Option<i64>,
     pub description: Option<String>,
+    pub datetime: Option<String>,
 }
 
 pub fn build_model_from_exist(data: ExistTrxWithAccCat) -> TrxModelWithAccCat {
@@ -114,6 +121,7 @@ pub fn build_model_from_exist(data: ExistTrxWithAccCat) -> TrxModelWithAccCat {
         description: data.description,
         balance_before: bigdecimal_to_int(data.balance_before),
         balance_after: bigdecimal_to_int(data.balance_after),
+        datetime: data.datetime,
         created_at: data.created_at,
         updated_at: data.updated_at,
         accountid: data.accountid,

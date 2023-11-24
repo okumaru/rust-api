@@ -110,6 +110,7 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
                 description: data.description.clone(),
                 balance_before: data.balance_before.clone(),
                 balance_after: data.balance_after.clone(),
+                datetime: data.datetime,
                 created_at: data.created_at,
                 updated_at: data.updated_at,
                 accountid: data.accountid,
@@ -144,6 +145,7 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
             description: data_trx.description,
             balance_before: data_trx.balance_before,
             balance_after: data_trx.balance_after,
+            datetime: data_trx.datetime,
             created_at: data_trx.created_at,
             updated_at: data_trx.updated_at,
             accountid: data_trx.accountid,
@@ -173,6 +175,7 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
             description: trx.description,
             balance_before: acc_balance,
             balance_after: &acc_balance + &amount,
+            datetime: trx.datetime,
             accountid: acc_id.clone(),
             categoryid: cat_id.clone(),
         };
@@ -315,11 +318,12 @@ fn query_add_trx<'a>(
             desc,
             trx.balance_before.to_string(),
             trx.balance_after.to_string(),
+            trx.datetime.to_string(),
             trx.accountid.to_string(),
             trx.categoryid.to_string(),
         ];
 
-        let mut query = sqlx::QueryBuilder::new(r#"INSERT INTO tbltransactions (credit, debit, description, balance_before, balance_after, accountid, categoryid) VALUES ("#);
+        let mut query = sqlx::QueryBuilder::new(r#"INSERT INTO tbltransactions (credit, debit, description, balance_before, balance_after, datetime, accountid, categoryid) VALUES ("#);
 
         let mut separated = query.separated(", ");
         for value in values.iter() {
@@ -417,6 +421,13 @@ fn query_update_trx<'a>(
             updates.push(UpdateQuery {
                 key: "description".to_string(),
                 value: trx.description.unwrap().to_string(),
+            })
+        }
+
+        if trx.datetime.is_some() {
+            updates.push(UpdateQuery {
+                key: "datetime".to_string(),
+                value: trx.datetime.unwrap().to_string(),
             })
         }
 
