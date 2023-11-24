@@ -216,9 +216,10 @@ pub fn query_update_trx_cat_badget<'a>(
 ) -> BoxFuture<'a, MySqlQueryResult> {
     async move {
 
+        let u_amount = if amount.is_negative() == false {amount} else {amount * -1};
         let mut query = sqlx::QueryBuilder::new(r#"UPDATE tblcategorybudgets SET "#);
-        query.push(" spent = spent +  ").push_bind(amount)
-            .push(" , available = available - ").push_bind(amount)
+        query.push(" spent = spent +  ").push_bind(u_amount)
+            .push(" , available = available - ").push_bind(u_amount)
             .push(" , updated_at = current_timestamp() ")
             .push(" WHERE categoryid = ").push_bind(catid)
             .push(" ORDER By id DESC LIMIT 1 ");
