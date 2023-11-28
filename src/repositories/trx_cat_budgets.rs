@@ -23,6 +23,10 @@ pub trait TransactionTrait: Send + Sync + TrxCatBudgetTrait {
 
 #[async_trait::async_trait]
 pub trait TrxCatBudgetTrait {
+    async fn trx_cat_budget_list(
+        &mut self,
+        categoryid: i32
+    ) -> Result<Vec<ExistTrxCatBudget>, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_cat_budget_detail(
         &mut self,
         id: i32,
@@ -81,6 +85,15 @@ impl TransactionTrait for TrxCatBudgetRepo<sqlx::Transaction<'static, MySql>> {
 
 #[async_trait::async_trait]
 impl<E: 'static + Executor> TrxCatBudgetTrait for TrxCatBudgetRepo<E> {
+    async fn trx_cat_budget_list(
+        &mut self,
+        categoryid: i32
+    ) -> Result<Vec<ExistTrxCatBudget>, Box<dyn std::error::Error + Send + Sync + 'static>> {
+
+        let budget = query_list_trx_cat_budget(&mut self.db, categoryid).await;
+        Ok(budget)
+    }
+
     async fn trx_cat_budget_detail(
         &mut self,
         id: i32,
@@ -131,6 +144,25 @@ impl<E: 'static + Executor> TrxCatBudgetTrait for TrxCatBudgetRepo<E> {
 
         Ok(budget)
     }
+}
+
+pub fn query_list_trx_cat_budget<'a>(
+    db: &'a mut impl Executor,
+    categoryid: i32
+) -> BoxFuture<'a, Vec<ExistTrxCatBudget>> {
+    async move {
+        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblcategorybudgets WHERE categoryid = "#);
+
+        let trx = query
+            .push_bind(categoryid)
+            .build_query_as::<ExistTrxCatBudget>()
+            .fetch_all(db.as_executor())
+            .await
+            .unwrap();
+
+        trx
+    }
+    .boxed()
 }
 
 pub fn query_detail_trx_cat_budget<'a>(
