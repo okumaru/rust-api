@@ -5,6 +5,7 @@ pub mod trx_cats;
 pub mod trx_cat_budgets;
 pub mod trxs;
 
+#[derive(Debug)]
 pub struct UpdateQuery {
     key: String,
     value: String,

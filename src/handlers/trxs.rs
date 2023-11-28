@@ -1,5 +1,5 @@
 
-use crate::handlers::req_query_id;
+use crate::handlers::{req_query_id, get_req_query};
 use crate::models::bigdecimal_to_int;
 use crate::models::trxs::{ TrxModel, TrxModelWithAccCat, NewTrx, UpdateTrx, build_model_from_exist };
 use crate::repositories::trxs::{TrxRepo, TrxTrait};
@@ -29,7 +29,9 @@ impl<'a> TrxHandler<'a> {
 
     async fn list(&mut self) -> Result<Response<Body>> {
 
-        let datas = self.trx_repo.trxs_list().await?;
+        let str_account_id: Option<String> = get_req_query(self.request, String::from("accountid"));
+        let str_category_id: Option<String> = get_req_query(self.request, String::from("categoryid"));
+        let datas = self.trx_repo.trxs_list(str_account_id, str_category_id).await?;
         let trxs: Vec<TrxModelWithAccCat> = datas.iter().map(|data| build_model_from_exist(data.clone())).collect();
 
         let res = match serde_json::to_string(&trxs) {
@@ -171,14 +173,18 @@ pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
     
     let request: hyper::Request<Body> = Request::from_parts(parts, body_bytes.clone().into());
     let mut trx_handler = TrxHandler::new(&request, pool);
+    let is_specified: bool = match get_req_query(&request, "id".to_string()) {
+        Some(_) => true,
+        None => false
+    };
 
-    match (request.method(), request.uri().query().is_none()) {
+    match (request.method(), is_specified) {
 
-        (&Method::GET, true) => trx_handler.list().await,
-        (&Method::GET, false) => trx_handler.detail().await,
-        (&Method::PUT, true) => trx_handler.add(body).await,
-        (&Method::POST, false) => trx_handler.update(body).await,
-        (&Method::DELETE, false) => trx_handler.delete().await,
+        (&Method::GET, false) => trx_handler.list().await,
+        (&Method::GET, true) => trx_handler.detail().await,
+        (&Method::PUT, false) => trx_handler.add(body).await,
+        (&Method::POST, true) => trx_handler.update(body).await,
+        (&Method::DELETE, true) => trx_handler.delete().await,
 
         // 
         _ => {
