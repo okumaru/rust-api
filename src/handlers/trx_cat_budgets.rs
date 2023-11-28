@@ -1,5 +1,5 @@
 
-use crate::handlers::req_query_id;
+use crate::handlers::{req_query_id, get_req_query};
 use crate::models::bigdecimal_to_int;
 use crate::models::trx_cat_budgets::{ TrxCatBudgetModel, NewTrxCatBudget, UpdateTrxCatBudget };
 use crate::repositories::trx_cat_budgets::{TrxCatBudgetRepo, TrxCatBudgetTrait};
@@ -25,6 +25,37 @@ impl<'a> TrxCatBudgetHandler<'a> {
             trx_cat_budget_repo: TrxCatBudgetRepo::new(pool),
             request: req,
         }
+    }
+
+    async fn list(&mut self) -> Result<Response<Body>> { 
+
+        let str_category_id: Option<String> = get_req_query(self.request, String::from("categoryid"));
+        let int_category_id: i32 = str_category_id.unwrap_or("0".to_string()).parse().ok().unwrap_or_default();
+        let datas = self.trx_cat_budget_repo.trx_cat_budget_list(int_category_id).await?;
+
+        let budget: Vec<TrxCatBudgetModel> = datas.iter().map(|data| TrxCatBudgetModel {
+            id: data.id,
+            periode: data.periode.clone(),
+            allocated: bigdecimal_to_int(data.allocated.clone()),
+            spent: bigdecimal_to_int(data.spent.clone()),
+            available: bigdecimal_to_int(data.available.clone()),
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            categoryid: data.categoryid,
+            }
+        ).collect();
+
+        let res = match serde_json::to_string(&budget) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(INTERNAL_SERVER_ERROR.into())
+                .unwrap(),
+        };
+        Ok(res)
     }
 
     async fn detail(&mut self) -> Result<Response<Body>> { 
@@ -154,14 +185,18 @@ pub async fn handler( req: Request<Body> ) -> Result<Response<Body>> {
     
     let request: hyper::Request<Body> = Request::from_parts(parts, body_bytes.clone().into());
     let mut trx_cat_budget_handler = TrxCatBudgetHandler::new(&request, pool);
+    let is_specified: bool = match get_req_query(&request, "id".to_string()) {
+        Some(_) => true,
+        None => false
+    };
 
-    match (request.method(), request.uri().query().is_none()) {
+    match (request.method(), is_specified) {
 
-        // (&Method::GET, true) => trx_cat_budget_handler.list().await,
-        (&Method::GET, false) => trx_cat_budget_handler.detail().await,
-        (&Method::PUT, true) => trx_cat_budget_handler.add(body).await,
-        (&Method::POST, false) => trx_cat_budget_handler.update(body).await,
-        (&Method::DELETE, false) => trx_cat_budget_handler.delete().await,
+        (&Method::GET, false) => trx_cat_budget_handler.list().await,
+        (&Method::GET, true) => trx_cat_budget_handler.detail().await,
+        (&Method::PUT, false) => trx_cat_budget_handler.add(body).await,
+        (&Method::POST, true) => trx_cat_budget_handler.update(body).await,
+        (&Method::DELETE, true) => trx_cat_budget_handler.delete().await,
 
         // 
         _ => {
