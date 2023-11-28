@@ -29,6 +29,8 @@ pub trait TransactionTrait: Send + Sync + TrxTrait {
 pub trait TrxTrait {
     async fn trxs_list(
         &mut self,
+        accountid: Option<String>,
+        categoryid: Option<String>
     ) -> Result<Vec<ExistTrxWithAccCat>, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn trx_detail(
         &mut self,
@@ -90,11 +92,13 @@ impl TransactionTrait for TrxRepo<sqlx::Transaction<'static, MySql>> {
 impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
     async fn trxs_list(
         &mut self,
+        accountid: Option<String>,
+        categoryid: Option<String>
     ) -> Result<Vec<ExistTrxWithAccCat>, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
         let mut trxs: Vec<ExistTrxWithAccCat> = Vec::new();
 
-        let data_trxs = query_list_trx(&mut self.db).await;
+        let data_trxs = query_list_trx(&mut self.db, accountid, categoryid).await;
         for data in data_trxs.iter() {
 
             let acc_id = data.accountid;
@@ -267,9 +271,40 @@ impl<E: 'static + Executor> TrxTrait for TrxRepo<E> {
 
 fn query_list_trx<'a>(
     db: &'a mut impl Executor,
+    accountid: Option<String>,
+    categoryid: Option<String>
 ) -> BoxFuture<'a, Vec<ExistTrx>> {
     async move {
         let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tbltransactions"#);
+
+        if accountid.is_some() || categoryid.is_some() {
+            query.push(" WHERE ");
+        }
+
+        let mut conditions: Vec<UpdateQuery> = Vec::new();
+
+        if accountid.is_some() {
+            conditions.push(UpdateQuery {
+                key: String::from("accountid"),
+                value: accountid.unwrap(),
+            });
+        }
+
+        if categoryid.is_some() {
+            conditions.push(UpdateQuery {
+                key: String::from("categoryid"),
+                value: categoryid.unwrap(),
+            });
+        }
+
+        let mut separated = query.separated(" AND ");
+        for condition in conditions.iter() {
+            separated.push(condition.key.clone())
+                .push_unseparated(" = ")
+                .push_bind_unseparated(condition.value.clone());
+        }
+
+        separated.push_unseparated(" ORDER by datetime DESC");
 
         let trxs = query
             .build_query_as::<ExistTrx>()
