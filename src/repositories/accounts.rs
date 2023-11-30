@@ -42,7 +42,7 @@ pub trait AccountTrait {
     async fn account_delete(
         &mut self,
         id: i32,
-    ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>>;
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync + 'static>>;
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +105,11 @@ impl<E: 'static + Executor> AccountTrait for AccountRepo<E> {
         &mut self,
         account: NewAccount,
     ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let account = query_add_account(&mut self.db, account).await;
+
+        let add = query_add_account(&mut self.db, account).await;
+        let account_id = i32::try_from(add.last_insert_id()).unwrap();
+
+        let account = query_detail_account(&mut self.db, account_id).await;
 
         Ok(account)
     }
@@ -115,7 +119,10 @@ impl<E: 'static + Executor> AccountTrait for AccountRepo<E> {
         id: i32,
         account: UpdateAccount,
     ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let account = query_update_account(&mut self.db, id, account).await;
+        
+        let _ = query_update_account(&mut self.db, id, account).await;
+
+        let account = query_detail_account(&mut self.db, id).await;
 
         Ok(account)
     }
@@ -123,10 +130,12 @@ impl<E: 'static + Executor> AccountTrait for AccountRepo<E> {
     async fn account_delete(
         &mut self,
         id: i32,
-    ) -> Result<ExistAccount, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let account = query_delete_account(&mut self.db, id).await;
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync + 'static>> {
 
-        Ok(account)
+        let res = query_delete_account(&mut self.db, id).await;
+        let success_delete = res.rows_affected() != 0;
+
+        Ok(success_delete)
     }
 }
 
@@ -169,7 +178,7 @@ pub fn query_detail_account<'a>(
 pub fn query_add_account<'a>(
     db: &'a mut impl Executor,
     account: NewAccount,
-) -> BoxFuture<'a, ExistAccount> {
+) -> BoxFuture<'a, MySqlQueryResult> {
     async move {
 
         let account_name = account.name;
@@ -195,15 +204,7 @@ pub fn query_add_account<'a>(
             .await
             .unwrap();
 
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblaccounts WHERE id = "#);
-        let accounts = query
-            .push_bind(add.last_insert_id())
-            .build_query_as::<ExistAccount>()
-            .fetch_one(db.as_executor())
-            .await
-            .unwrap();
-
-        accounts
+        add
     }
     .boxed()
 }
@@ -235,7 +236,7 @@ pub fn query_update_account<'a>(
     db: &'a mut impl Executor,
     id: i32,
     account: UpdateAccount,
-) -> BoxFuture<'a, ExistAccount> {
+) -> BoxFuture<'a, MySqlQueryResult> {
     async move {
 
         let mut query = sqlx::QueryBuilder::new(r#"UPDATE tblaccounts SET "#);
@@ -288,20 +289,12 @@ pub fn query_update_account<'a>(
             .push_unseparated(" WHERE id = ")
             .push_bind_unseparated(id);
         
-        query.build()
+        let res = query.build()
             .execute(db.as_executor())
             .await
             .unwrap();
 
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblaccounts WHERE id = "#);
-        let accounts = query
-            .push_bind(id)
-            .build_query_as::<ExistAccount>()
-            .fetch_one(db.as_executor())
-            .await
-            .unwrap();
-
-        accounts
+        res
     }
     .boxed()
 }
@@ -309,25 +302,17 @@ pub fn query_update_account<'a>(
 pub fn query_delete_account<'a>(
     db: &'a mut impl Executor,
     id: i32,
-) -> BoxFuture<'a, ExistAccount> {
+) -> BoxFuture<'a, MySqlQueryResult> {
     async move {
 
-        let mut query = sqlx::QueryBuilder::new(r#"SELECT * FROM tblaccounts WHERE id = "#);
-        let accounts = query
-            .push_bind(id)
-            .build_query_as::<ExistAccount>()
-            .fetch_one(db.as_executor())
-            .await
-            .unwrap();
-
         let mut query = sqlx::QueryBuilder::new(r#"DELETE FROM tblaccounts WHERE id = "#);
-        query.push_bind(id)
+        let res = query.push_bind(id)
             .build()
             .execute(db.as_executor())
             .await
             .unwrap();
 
-        accounts
+        res
     }
     .boxed()
 }
