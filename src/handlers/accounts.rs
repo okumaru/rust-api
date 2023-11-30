@@ -147,23 +147,12 @@ impl<'a> AccountHandler<'a> {
         let query_id = req_query_id(self.request);
         let delete_acc = self.account_repo.account_delete(query_id).await?;
 
-        let account = new_account(
-            &delete_acc.id, 
-            &delete_acc.name, 
-            &delete_acc.description, 
-            &delete_acc.star, 
-            &delete_acc.r#type, 
-            &delete_acc.balance,
-            &delete_acc.created_at,
-            &delete_acc.updated_at,
-        );
-
-        let res = match serde_json::to_string(&account) {
-            Ok(json) => Response::builder()
+        let res = match delete_acc {
+            true => Response::builder()
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(json))
+                .body(Body::from(delete_acc.to_string()))
                 .unwrap(),
-            Err(_) => Response::builder()
+            false => Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body(INTERNAL_SERVER_ERROR.into())
                 .unwrap(),

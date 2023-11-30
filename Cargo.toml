@@ -1,6 +1,6 @@
 [package]
 name = "sohfin_api"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["Andhika <okumaru07@gmail.com>"]
 edition = "2021"
 readme = "README.md"
